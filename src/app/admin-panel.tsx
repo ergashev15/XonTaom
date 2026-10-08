@@ -1,0 +1,67 @@
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
+import { Alert, View } from "react-native";
+import { AppText, Button, Card, Chip, Field, Metric, ResponsiveGrid, Row, Screen, StatusPill } from "@/components/ui";
+import { useAppStore } from "@/store/app-store";
+import { colors, money, radius, spacing } from "@/theme";
+
+const minutesBetween = (start: string, end?: string) => end ? Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000)) : 0;
+
+export default function AdminPanelScreen() {
+  const { restaurants, orders, campaigns, reviews, restaurantApplications, toggleBlocked, toggleCampaign, toggleReview, sendNotification, approveRestaurantApplication, rejectRestaurantApplication } = useAppStore();
+  const [tab, setTab] = useState("Umumiy");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("Barchasi");
+  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
+  const now = Date.now();
+  const delivered = orders.filter((order) => order.status === "Yetkazildi");
+  const unanswered = orders.filter((order) => ["Yangi buyurtma", "Restoran tasdig‘i kutilmoqda"].includes(order.status));
+  const late = unanswered.filter((order) => new Date(order.confirmationDeadline).getTime() < now);
+  const rejected = orders.filter((order) => order.status === "Rad etildi");
+  const problematic = orders.filter((order) => late.includes(order) || ["Rad etildi", "Bekor qilindi"].includes(order.status));
+  const accepted = orders.filter((order) => order.acceptedAt);
+  const avgAccept = accepted.length ? Math.round(accepted.reduce((sum, order) => sum + minutesBetween(order.createdAt, order.acceptedAt), 0) / accepted.length) : 0;
+  const avgDelivery = delivered.length ? Math.round(delivered.reduce((sum, order) => sum + minutesBetween(order.createdAt, order.deliveredAt), 0) / delivered.length) : 0;
+  const rejectionRate = orders.length ? Math.round(rejected.length / orders.length * 100) : 0;
+  const sales = delivered.reduce((sum, order) => sum + order.subtotal, 0);
+  const commission = delivered.reduce((sum, order) => sum + Math.round(order.subtotal * (restaurants.find((restaurant) => restaurant.id === order.restaurantId)?.commission ?? 0) / 100), 0);
+  const filteredOrders = useMemo(() => orders.filter((order) => `${order.id} ${order.restaurantName} ${order.customerName}`.toLowerCase().includes(query.toLowerCase()) && (status === "Barchasi" || order.status === status)), [orders, query, status]);
+
+  return <Screen>
+    <View><AppText variant="title">XonTaom boshqaruvi</AppText><AppText color={colors.muted}>Platforma holati, sifat va moliyaviy nazorat</AppText></View>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}><Metric label="Qabul tezligi" value={`${avgAccept} daq`} /><Metric label="Rad etish" value={`${rejectionRate}%`} tone="orange" /><Metric label="O‘rtacha yetkazish" value={`${avgDelivery} daq`} /><Metric label="Komissiya qarzi" value={money(commission)} tone="orange" /></View>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>{["Umumiy", "Arizalar", "Muammolar", "Restoranlar", "Buyurtmalar", "Kontent"].map((item) => <Chip key={item} label={item === "Arizalar" ? `Arizalar · ${restaurantApplications.filter((entry) => entry.status === "Kutilmoqda").length}` : item} active={tab === item} onPress={() => setTab(item)} />)}</View>
+
+    {tab === "Umumiy" ? <View style={{ gap: spacing.md }}><Card><AppText variant="heading">Operatsion holat</AppText><Row icon="time-outline" title="Javobsiz buyurtmalar" right={<AppText color={colors.orange}>{unanswered.length} ta</AppText>} /><Row icon="alert-circle-outline" title="Kechikkan buyurtmalar" right={<AppText color={colors.red}>{late.length} ta</AppText>} /><Row icon="close-circle-outline" title="Rad etilgan" subtitle={rejected.map((order) => order.rejectionReason).filter(Boolean).join("; ") || "Sabab yo‘q"} right={<AppText color={colors.red}>{rejected.length} ta</AppText>} /><Row icon="checkmark-done-outline" title="Yetkazilgan" right={<AppText color={colors.green}>{delivered.length} ta</AppText>} /></Card><Card><AppText variant="heading">Moliyaviy holat</AppText><Row title="Restoranlar savdosi" right={<AppText>{money(sales)}</AppText>} /><Row title="Platforma komissiyasi" right={<AppText color={colors.orange}>{money(commission)}</AppText>} /></Card><Card><AppText variant="heading">Tezkor aloqa</AppText><Button title="Yetkazish holati haqida bildirishnoma" icon="notifications-outline" onPress={() => { sendNotification("XonTaom xabari", "Buyurtmangiz holatini ilovada kuzatishingiz mumkin."); Alert.alert("Yuborildi", "Mijozlar uchun bildirishnoma yaratildi."); }} /></Card></View> : null}
+
+    {tab === "Arizalar" ? restaurantApplications.length ? <ResponsiveGrid maxColumns={2} minItemWidth={440}>{restaurantApplications.map((application) => <Card key={application.id} style={application.status === "Kutilmoqda" ? { borderWidth: 2, borderColor: colors.orange } : undefined}>
+      <View style={{ flexDirection: "row", gap: spacing.md, alignItems: "center" }}><Image source={{ uri: application.logo }} contentFit="cover" style={{ width: 70, height: 70, borderRadius: radius.md, backgroundColor: colors.line }} /><View style={{ flex: 1, gap: spacing.xs }}><AppText variant="heading">{application.restaurantName}</AppText><AppText variant="caption" color={colors.muted}>{application.ownerName} · {application.phone}</AppText><StatusPill open={application.status === "Tasdiqlandi"} label={application.status} /></View></View>
+      <Image source={{ uri: application.image }} contentFit="cover" style={{ width: "100%", height: 170, borderRadius: radius.lg, backgroundColor: colors.line }} />
+      <Row icon="location-outline" title={application.address} subtitle={`${application.cuisine} · ${application.hours}`} />
+      <Row title="Yetkazish narxi" right={<AppText>{money(application.deliveryFee)}</AppText>} />
+      <Row title="Minimal buyurtma" right={<AppText>{money(application.minOrder)}</AppText>} />
+      <View style={{ gap: spacing.sm }}><AppText variant="caption" color={colors.muted}>TASDIQLOVCHI HUJJAT</AppText><Image source={{ uri: application.documentImage }} contentFit="contain" style={{ width: "100%", height: 190, borderRadius: radius.md, backgroundColor: colors.surfaceMuted }} /></View>
+      {application.status === "Kutilmoqda" ? <><Field label="RAD ETISH SABABI" value={rejectionReasons[application.id] ?? ""} onChangeText={(value) => setRejectionReasons((current) => ({ ...current, [application.id]: value }))} placeholder="Masalan: hujjat rasmi aniq emas" /><View style={{ flexDirection: "row", gap: spacing.sm }}><Button title="Rad etish" variant="danger" icon="close-outline" onPress={() => rejectRestaurantApplication(application.id, rejectionReasons[application.id] ?? "")} style={{ flex: 1 }} /><Button title="Tasdiqlash" icon="checkmark-outline" onPress={() => { approveRestaurantApplication(application.id); Alert.alert("Tasdiqlandi", `${application.restaurantName} katalogga qo‘shildi va egasi panelga bog‘landi.`); }} style={{ flex: 1 }} /></View></> : application.status === "Tasdiqlandi" && application.restaurantId ? <Button title="Restoran panelini ko‘rish" icon="storefront-outline" variant="ghost" onPress={() => router.push({ pathname: "/restaurant-panel", params: { restaurantId: application.restaurantId } })} /> : <View style={{ padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.redSoft }}><AppText color={colors.red}>Sabab: {application.rejectionReason}</AppText></View>}
+    </Card>)}</ResponsiveGrid> : <Card><AppText color={colors.muted}>Hozircha restoran arizasi yo‘q.</AppText></Card> : null}
+
+    {tab === "Muammolar" ? problematic.length ? <ResponsiveGrid maxColumns={2} minItemWidth={420}>{problematic.map((order) => <Card key={order.id} style={late.includes(order) ? { borderWidth: 2, borderColor: colors.red } : undefined}><View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}><View style={{ flex: 1 }}><AppText variant="heading">#{order.id} · {order.restaurantName}</AppText><AppText variant="caption" color={colors.muted}>{order.customerName} · {order.phone}</AppText></View><StatusPill open={false} label={late.includes(order) ? "Javob kechikdi" : order.status} /></View><Row title="Muammo" subtitle={order.rejectionReason ?? "Restoran tasdig‘i belgilangan vaqtda kelmadi"} /><Button title="Yordam xizmatiga eskalatsiya" variant="danger" onPress={() => Alert.alert("Eskalatsiya qilindi", `${order.id} operator navbatiga qo‘shildi.`)} /></Card>)}</ResponsiveGrid> : <Card><AppText color={colors.green}>Muammoli buyurtma yo‘q.</AppText></Card> : null}
+
+    {tab === "Restoranlar" ? <ResponsiveGrid maxColumns={2} minItemWidth={440}>{restaurants.map((restaurant) => {
+      const own = orders.filter((order) => order.restaurantId === restaurant.id);
+      const ownDelivered = own.filter((order) => order.status === "Yetkazildi");
+      const ownRejected = own.filter((order) => order.status === "Rad etildi");
+      const ownLate = own.filter((order) => ["Yangi buyurtma", "Restoran tasdig‘i kutilmoqda"].includes(order.status) && new Date(order.confirmationDeadline).getTime() < now);
+      const ownSales = ownDelivered.reduce((sum, order) => sum + order.subtotal, 0);
+      const acceptedOwn = own.filter((order) => order.acceptedAt);
+      const speed = acceptedOwn.length ? Math.round(acceptedOwn.reduce((sum, order) => sum + minutesBetween(order.createdAt, order.acceptedAt), 0) / acceptedOwn.length) : 0;
+      const quality = Math.max(0, Math.min(100, Math.round(restaurant.rating * 20 - (own.length ? ownRejected.length / own.length * 20 : 0) - (own.length ? ownLate.length / own.length * 10 : 0))));
+      const debt = Math.round(ownSales * restaurant.commission / 100);
+      return <Card key={restaurant.id}><View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}><View style={{ flex: 1 }}><AppText variant="heading">{restaurant.name}</AppText><AppText variant="caption" color={colors.muted}>{restaurant.phone} · {restaurant.address}</AppText></View><StatusPill open={!restaurant.isBlocked} label={restaurant.isBlocked ? "Bloklangan" : "Faol"} /></View><Row title="Sifat reytingi" right={<AppText color={quality >= 80 ? colors.green : colors.orange}>{quality}/100</AppText>} /><Row title="Qabul qilish tezligi" right={<AppText>{speed} daqiqa</AppText>} /><Row title="Rad etish foizi" right={<AppText color={colors.red}>{own.length ? Math.round(ownRejected.length / own.length * 100) : 0}%</AppText>} /><Row title="Savdo" right={<AppText>{money(ownSales)}</AppText>} /><Row title={`Komissiya qarzi (${restaurant.commission}%)`} right={<AppText color={colors.orange}>{money(debt)}</AppText>} /><Button title={restaurant.isBlocked ? "Blokdan chiqarish" : "Restoranni bloklash"} variant={restaurant.isBlocked ? "primary" : "danger"} onPress={() => toggleBlocked(restaurant.id)} /></Card>;
+    })}</ResponsiveGrid> : null}
+
+    {tab === "Buyurtmalar" ? <View style={{ gap: spacing.md }}><Field label="Buyurtma, mijoz yoki restoran qidirish" value={query} onChangeText={setQuery} placeholder="XT-1048..." /><View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>{["Barchasi", "Restoran tasdig‘i kutilmoqda", "Yetkazildi", "Rad etildi"].map((item) => <Chip key={item} label={item} active={status === item} onPress={() => setStatus(item)} />)}</View><ResponsiveGrid maxColumns={2} minItemWidth={420}>{filteredOrders.map((order) => <Card key={order.id}><View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}><View style={{ flex: 1 }}><AppText variant="heading">#{order.id}</AppText><AppText variant="caption" color={colors.muted}>{order.restaurantName} · {order.customerName}</AppText></View><StatusPill open={!order.status.includes("Rad")} label={order.status} /></View><Row title="Summa" right={<AppText variant="heading">{money(order.total)}</AppText>} /><Row title="Manzil" subtitle={order.address} /></Card>)}</ResponsiveGrid></View> : null}
+
+    {tab === "Kontent" ? <View style={{ gap: spacing.md }}><Card><AppText variant="heading">Banner, chegirma va promo-kodlar</AppText>{campaigns.map((campaign) => <Row key={campaign.id} icon={campaign.type === "Banner" ? "images-outline" : "pricetag-outline"} title={campaign.title} subtitle={`${campaign.type}${campaign.code ? ` · ${campaign.code}` : ""}`} right={<Button title={campaign.active ? "Faol" : "O‘chiq"} variant={campaign.active ? "primary" : "danger"} onPress={() => toggleCampaign(campaign.id)} />} />)}</Card><Card><AppText variant="heading">Sharhlar moderatsiyasi</AppText>{reviews.map((review) => <View key={review.id} style={{ gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}><View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}><View style={{ flex: 1 }}><AppText style={{ fontWeight: "700" }}>{review.customerName} · {"★".repeat(review.rating)}</AppText><AppText variant="caption" color={colors.muted}>{review.comment}</AppText></View><Button title={review.visible ? "Ko‘rinadi" : "Yashirilgan"} variant={review.visible ? "primary" : "danger"} onPress={() => toggleReview(review.id)} /></View></View>)}</Card></View> : null}
+  </Screen>;
+}

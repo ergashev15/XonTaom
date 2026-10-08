@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "XonTaom",
+    "slug": "xontaom",
+    "version": "1.7.2",
+    "icon": "./assets/xontaom-app-icon.png",
+    "orientation": "portrait",
+    "scheme": "xontaom",
+    "userInterfaceStyle": "light",
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "uz.xontaom.app",
+      "infoPlist": {
+        "CADisableMinimumFrameDurationOnPhone": true
+      }
+    },
+    "android": {
+      "package": "uz.xontaom.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/xontaom-app-icon.png",
+        "backgroundColor": "#B6000C"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "XonTaom restoran menyusiga taom rasmini qo‘shish uchun galereyaga kirish ruxsatini so‘raydi.",
+          "cameraPermission": false
+        }
+      ],
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

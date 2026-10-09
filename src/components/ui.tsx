@@ -5,13 +5,14 @@ import React, { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, TextStyle, View, ViewStyle, useWindowDimensions, type GestureResponderEvent, type Insets } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
-import { breakpoints, colors, layout, money, radius, shadow, spacing, type } from "@/theme";
+import { breakpoints, colors, layout, money, radius, shadow, spacing, type, useAppTheme } from "@/theme";
 import { Restaurant } from "@/types";
 import { DropletBackdrop, GlassSurface } from "@/components/glass-surface";
 
 const router = expoRouter as typeof expoRouter & { replace: (href: string) => void };
 
 export function Screen({ children, style, maxWidth, safeTop = false }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; maxWidth?: number; safeTop?: boolean }) {
+  useAppTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const edgePadding = width >= breakpoints.desktop ? spacing.lg : spacing.md;
@@ -35,6 +36,7 @@ export function ResponsiveGrid({ children, maxColumns = 3, minItemWidth = 300, s
 }
 
 export function AppText({ children, variant = "body", color, style, selectable = false, numberOfLines }: { children: React.ReactNode; variant?: "hero" | "title" | "heading" | "body" | "caption"; color?: string; style?: StyleProp<TextStyle>; selectable?: boolean; numberOfLines?: number }) {
+  useAppTheme();
   return <Text selectable={selectable} numberOfLines={numberOfLines} style={[type[variant], { color: color ?? colors.ink }, style]}>{children}</Text>;
 }
 
@@ -45,7 +47,8 @@ export function PressableScale({ children, onPress, style, accessibilityLabel, a
 }
 
 export function Button({ title, onPress, variant = "primary", icon, disabled, loading, size = "md", style }: { title: string; onPress: () => void; variant?: "primary" | "secondary" | "ghost" | "danger"; icon?: keyof typeof Ionicons.glyphMap; disabled?: boolean; loading?: boolean; size?: "sm" | "md" | "lg"; style?: StyleProp<ViewStyle> }) {
-  const palette = variant === "primary" ? [colors.green, colors.white] : variant === "danger" ? ["rgba(252,235,236,0.84)", colors.red] : variant === "secondary" ? ["rgba(255,240,233,0.82)", colors.orange] : [colors.glassStrong, colors.green];
+  useAppTheme();
+  const palette = variant === "primary" ? [colors.green, colors.white] : variant === "danger" ? [colors.redSoft, colors.red] : variant === "secondary" ? [colors.orangeSoft, colors.orange] : [colors.glassStrong, colors.green];
   const [pressed, setPressed] = useState(false);
   const reducedMotion = useReducedMotion();
   return (
@@ -56,7 +59,8 @@ export function Button({ title, onPress, variant = "primary", icon, disabled, lo
 }
 
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
-  return <View style={{ gap: spacing.sm }}><AppText variant="caption" color={colors.muted}>{label}</AppText><TextInput placeholderTextColor="#74827B" {...props} style={[{ minHeight: 54, backgroundColor: "rgba(255,255,255,0.50)", borderWidth: 1, borderColor: "rgba(255,255,255,0.82)", borderRadius: radius.md, borderCurve: "continuous", paddingHorizontal: spacing.md, color: colors.ink, fontSize: 16 }, props.style]} /></View>;
+  useAppTheme();
+  return <View style={{ gap: spacing.sm }}><AppText variant="caption" color={colors.muted}>{label}</AppText><TextInput placeholderTextColor={colors.placeholder} {...props} style={[{ minHeight: 54, backgroundColor: colors.inputTranslucent, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: radius.md, borderCurve: "continuous", paddingHorizontal: spacing.md, color: colors.ink, fontSize: 16 }, props.style]} /></View>;
 }
 
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
@@ -82,7 +86,7 @@ export function RestaurantCard({ restaurant, favorite, onFavorite }: { restauran
         <Animated.View style={[motionStyles.base, pressed && !reducedMotion ? motionStyles.pressed : undefined, { opacity: pressed ? 0.9 : 1 }]}><Card style={{ padding: 0, overflow: "hidden", gap: 0, borderRadius: radius.lg }}>
           <View>
             <Image source={{ uri: restaurant.image }} style={{ width: "100%", height: 190, backgroundColor: colors.line }} contentFit="cover" transition={200} />
-            <PressableScale accessibilityLabel={favorite ? "Sevimlidan olib tashlash" : "Sevimliga qo‘shish"} onPress={(event) => { event.stopPropagation(); onFavorite(); }} style={{ position: "absolute", right: 12, top: 12, width: 44, height: 44, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.94)", borderRadius: radius.full }}><Ionicons name={favorite ? "heart" : "heart-outline"} size={23} color={favorite ? colors.orange : colors.ink} /></PressableScale>
+            <PressableScale accessibilityLabel={favorite ? "Sevimlidan olib tashlash" : "Sevimliga qo‘shish"} onPress={(event) => { event.stopPropagation(); onFavorite(); }} style={{ position: "absolute", right: 12, top: 12, width: 44, height: 44, alignItems: "center", justifyContent: "center", backgroundColor: colors.floatingSurface, borderRadius: radius.full }}><Ionicons name={favorite ? "heart" : "heart-outline"} size={23} color={favorite ? colors.orange : colors.ink} /></PressableScale>
             <View style={{ position: "absolute", left: 12, bottom: 12, paddingVertical: 7, paddingHorizontal: 11, backgroundColor: "rgba(23,33,27,0.88)", borderRadius: radius.full }}><AppText variant="caption" color={colors.white}>⏱ {restaurant.eta}</AppText></View>
             {!restaurant.isOpen || restaurant.isBlocked ? <View style={{ position: "absolute", left: 12, top: 12 }}><StatusPill open={false} label={restaurant.isBlocked ? "Vaqtincha mavjud emas" : "Yopiq"} /></View> : null}
           </View>
@@ -98,7 +102,7 @@ export function RestaurantCard({ restaurant, favorite, onFavorite }: { restauran
 }
 
 export function Metric({ label, value, tone = "green" }: { label: string; value: string; tone?: "green" | "orange" }) {
-  return <GlassSurface style={{ minWidth: 150, flex: 1, backgroundColor: tone === "green" ? "rgba(226,242,233,0.52)" : "rgba(255,240,233,0.52)", borderRadius: radius.lg, padding: spacing.md, gap: spacing.xs }}><AppText variant="caption" color={colors.muted}>{label}</AppText><AppText variant="title" color={tone === "green" ? colors.green : colors.orange}>{value}</AppText></GlassSurface>;
+  return <GlassSurface style={{ minWidth: 150, flex: 1, backgroundColor: tone === "green" ? colors.metricGreen : colors.metricOrange, borderRadius: radius.lg, padding: spacing.md, gap: spacing.xs }}><AppText variant="caption" color={colors.muted}>{label}</AppText><AppText variant="title" color={tone === "green" ? colors.green : colors.orange}>{value}</AppText></GlassSurface>;
 }
 
 export function SectionHeader({ title, action }: { title: string; action?: string }) {

@@ -47,6 +47,12 @@ Ilova Supabase Phone OTP bilan real SMS orqali kirishga tayyor. Sessiya Android/
 
 Sozlash qo‘llanmasi: [docs/PHONE_AUTH_SETUP.md](docs/PHONE_AUTH_SETUP.md).
 
+## Restoran egasi uchun Google kirishi
+
+Restoran portali va mobil ilova bir xil Google/Supabase akkauntini ishlatadi. Portalda yaratilgan restoran `owner_id` orqali mobil ilovadagi restoran paneliga avtomatik bog‘lanadi.
+
+Google provider va redirect manzillarini yoqish: [docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md).
+
 ## Ilova rollari
 
 - Mijoz: restoran qidirish, menyu ko‘rish, sevimli qilish, savat, manzil/to‘lov va buyurtma kuzatuvi.

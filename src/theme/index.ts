@@ -1,27 +1,5 @@
-export const colors = {
-  background: "#F7F8F7",
-  surface: "#FFFFFF",
-  surfaceMuted: "#F1F3F2",
-  ink: "#17211B",
-  muted: "#6E7772",
-  line: "#E8ECE9",
-  green: "#079447",
-  greenDark: "#056B35",
-  greenSoft: "#E7F7ED",
-  orange: "#F36D32",
-  orangeSoft: "#FFF0E9",
-  red: "#C73B3B",
-  redSoft: "#FCEBEC",
-  yellow: "#F6C453",
-  yellowSoft: "#FFF6D8",
-  glass: "rgba(255,255,255,0.96)",
-  glassStrong: "#FFFFFF",
-  glassDark: "rgba(4,68,43,0.72)",
-  glassRim: "#E8ECE9",
-  glassShade: "rgba(7,148,71,0.02)",
-  aqua: "#86D8D0",
-  white: "#FFFFFF"
-} as const;
+export { colors, darkColors, lightColors, type ThemeColors } from "@/theme/colors";
+export { AppThemeProvider, useAppTheme, type ThemeMode } from "@/theme/theme-provider";
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
 export const breakpoints = { tablet: 700, desktop: 1100, wide: 1400 } as const;

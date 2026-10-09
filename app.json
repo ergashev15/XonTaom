@@ -2,11 +2,11 @@
   "expo": {
     "name": "XonTaom",
     "slug": "xontaom",
-    "version": "1.7.2",
+    "version": "1.7.6",
     "icon": "./assets/xontaom-app-icon.png",
     "orientation": "portrait",
     "scheme": "xontaom",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "web": {
       "bundler": "metro",
       "output": "static"
@@ -36,7 +36,8 @@
         }
       ],
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

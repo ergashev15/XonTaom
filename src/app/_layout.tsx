@@ -7,10 +7,11 @@ import { AccessibilityInfo, ActivityIndicator, View } from "react-native";
 import { AuthProvider, useAuth } from "@/auth/auth-context";
 import { authEnvironment, roleOf, routeForRole } from "@/auth/auth-service";
 import { AppStoreProvider } from "@/store/app-store";
-import { colors } from "@/theme";
+import { AppThemeProvider, colors, useAppTheme } from "@/theme";
 
 function AppNavigator() {
   const { session, ready } = useAuth();
+  const { isDark } = useAppTheme();
   const segments = useSegments();
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -21,20 +22,25 @@ function AppNavigator() {
   }, []);
 
   useEffect(() => {
-    if (!ready || !authEnvironment.isRequired) return;
+    if (!ready) return;
     const first = String(segments[0] ?? "");
     const protectedRoute = ["home", "restaurants", "dishes", "restaurant", "item", "cart", "checkout", "orders", "profile", "restaurant-panel", "admin-panel"].includes(first);
-    if (!session && protectedRoute) { router.replace("/"); return; }
-    if (!session) return;
+    if (!session) {
+      if (first === "restaurant-panel" || first === "admin-panel") { router.replace("/staff-access"); return; }
+      if (authEnvironment.isRequired && protectedRoute) router.replace("/");
+      return;
+    }
     const role = roleOf(session);
+    if ((role === "restaurant" || role === "admin") && (first === "index" || first === "staff-access")) { router.replace(routeForRole(role)); return; }
     if ((first === "admin-panel" && role !== "admin") || (first === "restaurant-panel" && role !== "restaurant" && role !== "admin")) router.replace(routeForRole(role));
   }, [ready, session, segments]);
 
   if (!ready) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}><ActivityIndicator size="large" color={colors.green} /></View>;
   return (
-    <><StatusBar style="dark" /><Stack screenOptions={{ animation: reducedMotion ? "fade" : "default", headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.green, headerTitleStyle: { color: colors.ink, fontWeight: "800" }, headerBackButtonDisplayMode: "minimal", contentStyle: { backgroundColor: colors.background } }}>
+    <><StatusBar style={isDark ? "light" : "dark"} /><Stack screenOptions={{ animation: reducedMotion ? "fade" : "default", headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.green, headerTitleStyle: { color: colors.ink, fontWeight: "800" }, headerBackButtonDisplayMode: "minimal", contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="staff-access" options={{ title: "Xodimlar kirishi", presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.65, 1] }} />
+        <Stack.Screen name="staff-access" options={{ title: "Restoran egasi kirishi", presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.65, 1] }} />
+        <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="restaurant-application" options={{ title: "Restoran qo‘shish" }} />
         <Stack.Screen name="home" options={{ title: "XonTaom", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />
         <Stack.Screen name="restaurants" options={{ title: "Restoranlar", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />
@@ -52,5 +58,5 @@ function AppNavigator() {
 }
 
 export default function RootLayout() {
-  return <AuthProvider><AppStoreProvider><AppNavigator /></AppStoreProvider></AuthProvider>;
+  return <AppThemeProvider><AuthProvider><AppStoreProvider><AppNavigator /></AppStoreProvider></AuthProvider></AppThemeProvider>;
 }

@@ -1,7 +1,7 @@
 import { File, Paths } from "expo-file-system";
 import React, { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
-import { catalogApiEnvironment, fetchCatalog } from "@/api/catalog-api";
+import { catalogApiEnvironment, fetchCatalog, fetchOwnedRestaurant } from "@/api/catalog-api";
 import { createServerOrder } from "@/api/order-api";
 import { useAuth } from "@/auth/auth-context";
 import { campaignsSeed, ordersSeed, restaurantsSeed, reviewsSeed } from "@/data/seed";
@@ -79,10 +79,15 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     setCatalogStatus((current) => ({ ...current, syncing: true, error: undefined }));
     try {
       const remote = await fetchCatalog();
+      const ownerRestaurantId = session?.user.app_metadata?.restaurant_id;
+      const owned = ownerRestaurantId && session?.access_token
+        ? await fetchOwnedRestaurant(ownerRestaurantId, session.access_token)
+        : null;
+      const merged = owned ? [owned, ...remote.filter((restaurant) => restaurant.id !== owned.id)] : remote;
       // A newly created server can legitimately have no approved restaurants yet.
       // Keep the built-in catalog usable instead of replacing it with an empty view.
-      if (remote.length) {
-        setRestaurants(remote);
+      if (merged.length) {
+        setRestaurants(merged);
         setCatalogStatus({ loading: false, syncing: false, source: "server", lastSyncedAt: new Date().toISOString() });
       } else {
         setCatalogStatus({ loading: false, syncing: false, source: "local", lastSyncedAt: new Date().toISOString() });
@@ -90,7 +95,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       setCatalogStatus((current) => ({ ...current, loading: false, syncing: false, error: error instanceof Error ? error.message : "Katalog yangilanmadi." }));
     }
-  }, []);
+  }, [session?.access_token, session?.user.app_metadata?.restaurant_id]);
 
   useEffect(() => {
     if (!catalogApiEnvironment.isConfigured) return;

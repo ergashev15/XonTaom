@@ -12,10 +12,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
-  const [ready, setReady] = useState(!authEnvironment.isRequired);
+  const [ready, setReady] = useState(!authEnvironment.isConfigured);
 
   useEffect(() => {
-    if (!authEnvironment.isRequired) return;
+    if (!authEnvironment.isConfigured) return;
     let active = true;
     restoreSession().then((next) => { if (active) setSession(next); }).catch(() => { if (active) setSession(null); }).finally(() => { if (active) setReady(true); });
     return () => { active = false; };

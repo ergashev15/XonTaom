@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Linking, ScrollView, View } from "react-native";
 import { MenuItemForm } from "@/components/menu-item-form";
@@ -27,11 +27,13 @@ function countdown(deadline: string, now: number) {
 }
 
 export default function RestaurantPanelScreen() {
-  const { restaurants, orders, toggleRestaurant, toggleMenuItem, addMenuItem, updateMenuItem, deleteMenuItem, updateOrder, setPrepMinutes } = useAppStore();
-  const { session } = useAuth();
+  const { restaurants, orders, catalogStatus, refreshCatalog, toggleRestaurant, toggleMenuItem, addMenuItem, updateMenuItem, deleteMenuItem, updateOrder, setPrepMinutes } = useAppStore();
+  const { session, signOut } = useAuth();
   const { restaurantId } = useLocalSearchParams<{ restaurantId?: string }>();
   const assignedRestaurantId = restaurantId ?? session?.user.app_metadata?.restaurant_id;
-  const restaurant = restaurants.find((entry) => entry.id === assignedRestaurantId) ?? restaurants[0];
+  const assignedRestaurant = restaurants.find((entry) => entry.id === assignedRestaurantId);
+  const ownerRestaurantLoading = Boolean(assignedRestaurantId && !assignedRestaurant);
+  const restaurant = assignedRestaurant ?? restaurants[0];
   const [tab, setTab] = useState("Buyurtmalar");
   const [reason, setReason] = useState("Taom mahsuloti tugagan");
   const [now, setNow] = useState(Date.now());
@@ -43,7 +45,7 @@ export default function RestaurantPanelScreen() {
   const { isDesktop } = useResponsiveLayout();
   const player = useAudioPlayer(require("../../assets/sounds/new-order.wav"));
   const previousWaiting = useRef(0);
-  const ownOrders = orders.filter((order) => order.restaurantId === restaurant.id);
+  const ownOrders = ownerRestaurantLoading ? [] : orders.filter((order) => order.restaurantId === restaurant.id);
   const waiting = ownOrders.filter((order) => ["Yangi buyurtma", "Restoran tasdig‘i kutilmoqda"].includes(order.status));
 
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
@@ -94,8 +96,10 @@ export default function RestaurantPanelScreen() {
     </Card>;
   };
 
+  if (ownerRestaurantLoading) return <Screen maxWidth={720} style={{ justifyContent: "center", minHeight: "100%" }}><EmptyState icon="storefront-outline" title={catalogStatus.error ? "Restoran yuklanmadi" : "Restoran yuklanmoqda"} text={catalogStatus.error ?? "Saytda qo‘shilgan restoran ma’lumotlari serverdan olinmoqda."} action={<Button title="Qayta tekshirish" loading={catalogStatus.syncing} onPress={() => void refreshCatalog()} />} /></Screen>;
+
   return <Screen maxWidth={1280}>
-    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, flexWrap: "wrap" }}><View><AppText variant="title">{restaurant.name}</AppText><AppText color={colors.muted}>Restoran boshqaruvi · {restaurant.hours}</AppText></View><Button title={restaurant.isOpen ? "Restoran ochiq" : "Restoran yopiq"} icon={restaurant.isOpen ? "checkmark-circle" : "close-circle"} variant={restaurant.isOpen ? "primary" : "danger"} onPress={() => toggleRestaurant(restaurant.id)} /></View>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, flexWrap: "wrap" }}><View><AppText variant="title">{restaurant.name}</AppText><AppText color={colors.muted}>Restoran boshqaruvi · {restaurant.hours}</AppText></View><View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}><Button title={restaurant.isOpen ? "Restoran ochiq" : "Restoran yopiq"} icon={restaurant.isOpen ? "checkmark-circle" : "close-circle"} variant={restaurant.isOpen ? "primary" : "danger"} onPress={() => toggleRestaurant(restaurant.id)} /><Button title="Chiqish" icon="log-out-outline" variant="ghost" onPress={() => { void signOut().then(() => router.replace("/")); }} /></View></View>
     {waiting.length ? <View style={{ padding: spacing.md, backgroundColor: colors.orangeSoft, borderRadius: 14 }}><AppText color={colors.orange} style={{ fontWeight: "800" }}>🔔 {waiting.length} ta yangi buyurtma — ovozli signal yoqilgan</AppText></View> : null}
     {lowStock.length ? <View style={{ padding: spacing.md, backgroundColor: colors.yellowSoft, borderRadius: 14 }}><AppText color={colors.ink} style={{ fontWeight: "800" }}>⚠️ Kam qolgan: {lowStock.map((item) => `${item.name} (${item.stock})`).join(", ")}</AppText></View> : null}
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>{summary.map((item) => <Metric key={item.label} {...item} />)}</View>

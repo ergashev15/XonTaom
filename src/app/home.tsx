@@ -38,8 +38,8 @@ export default function HomeScreen() {
       </View>
 
       <View style={{ flexDirection: "row", gap: spacing.sm }}>
-        <View style={{ flex: 1, minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: "#F0F2F1" }}><Ionicons name="search" size={21} color={colors.muted} /><TextInput accessibilityLabel="Taom yoki restoran qidirish" value={query} onChangeText={setQuery} placeholder="Taom yoki restoran qidirish..." placeholderTextColor="#7D8C84" style={{ flex: 1, minHeight: 52, color: colors.ink, fontSize: 15 }} />{query ? <PressableScale accessibilityLabel="Qidiruvni tozalash" onPress={() => setQuery("")}><Ionicons name="close-circle" size={21} color={colors.muted} /></PressableScale> : null}</View>
-        <View style={{ width: 52, height: 52, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: "#F0F2F1" }}><Ionicons name="options-outline" size={22} color={colors.ink} /></View>
+        <View style={{ flex: 1, minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.input }}><Ionicons name="search" size={21} color={colors.muted} /><TextInput accessibilityLabel="Taom yoki restoran qidirish" value={query} onChangeText={setQuery} placeholder="Taom yoki restoran qidirish..." placeholderTextColor={colors.placeholder} style={{ flex: 1, minHeight: 52, color: colors.ink, fontSize: 15 }} />{query ? <PressableScale accessibilityLabel="Qidiruvni tozalash" onPress={() => setQuery("")}><Ionicons name="close-circle" size={21} color={colors.muted} /></PressableScale> : null}</View>
+        <View style={{ width: 52, height: 52, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.input }}><Ionicons name="options-outline" size={22} color={colors.ink} /></View>
       </View>
 
       {!query ? <View style={{ height: 178, overflow: "hidden", borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.greenDark, boxShadow: shadow.card }}>

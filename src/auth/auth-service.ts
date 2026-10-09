@@ -1,6 +1,10 @@
 import { fetch } from "expo/fetch";
+import * as AuthSessionBrowser from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export type UserRole = "customer" | "restaurant" | "admin";
 
@@ -55,6 +59,8 @@ async function parseResponse<T>(response: Response): Promise<T> {
     const raw = String(body.message ?? body.msg ?? body.error_description ?? body.error ?? "So‘rov bajarilmadi.");
     const message = /unsupported phone provider|sms provider|phone provider/i.test(raw)
       ? "Telefon orqali kirish xizmati hali ishga tushirilmagan. Iltimos, administratorga murojaat qiling."
+      : /unsupported provider|provider is not enabled/i.test(raw)
+        ? "Google orqali kirish serverda hali yoqilmagan. Administrator Google provayderini sozlashi kerak."
       : response.status === 429
         ? "Juda ko‘p urinish. Bir oz kutib, qayta urinib ko‘ring."
         : /invalid login credentials/i.test(raw)
@@ -108,6 +114,35 @@ export function routeForRole(role: UserRole): "/home" | "/restaurant-panel" | "/
   return "/home";
 }
 
+type ProfileAccessRow = { role?: UserRole };
+type OwnedRestaurantRow = { id: string };
+
+async function hydrateSessionAccess(session: AuthSession) {
+  if (DEV_AUTH || !SUPABASE_URL || !SUPABASE_KEY) return session;
+  const accessHeaders = headers(session.access_token);
+  const [profileResponse, restaurantResponse] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/profiles?select=role&id=eq.${session.user.id}&limit=1`, { headers: accessHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/restaurants?select=id&owner_id=eq.${session.user.id}&order=created_at.asc&limit=1`, { headers: accessHeaders })
+  ]);
+  const profileRows = await parseResponse<ProfileAccessRow[]>(profileResponse);
+  const restaurantRows = await parseResponse<OwnedRestaurantRow[]>(restaurantResponse);
+  const profileRole = profileRows[0]?.role;
+  const ownedRestaurantId = restaurantRows[0]?.id;
+  const role: UserRole = profileRole === "admin" ? "admin" : ownedRestaurantId ? "restaurant" : "customer";
+  const { restaurant_id: _previousRestaurantId, ...appMetadata } = session.user.app_metadata ?? {};
+  return {
+    ...session,
+    user: {
+      ...session.user,
+      app_metadata: {
+        ...appMetadata,
+        role,
+        ...(ownedRestaurantId ? { restaurant_id: ownedRestaurantId } : {})
+      }
+    }
+  } satisfies AuthSession;
+}
+
 async function writeSession(session: AuthSession | null) {
   if (Platform.OS === "web") {
     if (typeof sessionStorage === "undefined") return;
@@ -159,7 +194,7 @@ export async function verifyPhoneOtp(phone: string, token: string, requestedRole
     headers: headers(),
     body: JSON.stringify({ phone, token, type: "sms" })
   });
-  const session = await parseResponse<AuthSession>(response);
+  const session = await hydrateSessionAccess(await parseResponse<AuthSession>(response));
   await writeSession(session);
   return session;
 }
@@ -176,7 +211,73 @@ export async function signInWithEmail(email: string, password: string) {
   } catch {
     throw new AuthError("Internet bilan aloqa yo‘q. Ulanishni tekshirib, qayta urinib ko‘ring.", "NETWORK_ERROR");
   }
-  const session = await parseResponse<AuthSession>(response);
+  const session = await hydrateSessionAccess(await parseResponse<AuthSession>(response));
+  await writeSession(session);
+  return session;
+}
+
+function oauthCallbackParams(callbackUrl: string) {
+  const parsed = new URL(callbackUrl);
+  const params = new URLSearchParams(parsed.search);
+  const fragment = new URLSearchParams(parsed.hash.replace(/^#/, ""));
+  fragment.forEach((value, key) => params.set(key, value));
+  return params;
+}
+
+export async function signInWithGoogle() {
+  assertConfigured();
+  if (DEV_AUTH) {
+    throw new AuthError("Google kirishini haqiqiy server ulanishida sinash mumkin.", "GOOGLE_AUTH_DEV_MODE");
+  }
+
+  const redirectUri = Platform.OS === "web"
+    ? AuthSessionBrowser.makeRedirectUri({ path: "auth/callback" })
+    : AuthSessionBrowser.makeRedirectUri({ scheme: "xontaom", path: "auth/callback", native: "xontaom://auth/callback" });
+  const authorizeUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}`;
+
+  try {
+    const availability = await fetch(authorizeUrl, { headers: headers(), redirect: "manual" });
+    if (availability.status >= 400) await parseResponse<Record<string, never>>(availability);
+  } catch (error) {
+    if (error instanceof AuthError) throw error;
+    throw new AuthError("Internet bilan aloqa yo‘q. Ulanishni tekshirib, qayta urinib ko‘ring.", "NETWORK_ERROR");
+  }
+
+  const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, redirectUri, {
+    toolbarColor: "#056B35",
+    controlsColor: "#FFFFFF",
+    preferEphemeralSession: false
+  });
+  if (result.type !== "success") {
+    throw new AuthError("Google orqali kirish bekor qilindi.", "OAUTH_CANCELLED");
+  }
+
+  const params = oauthCallbackParams(result.url);
+  const oauthError = params.get("error_description") ?? params.get("error");
+  if (oauthError) throw new AuthError(oauthError, params.get("error_code") ?? "OAUTH_FAILED");
+
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+  const expiresIn = Number(params.get("expires_in") ?? 3600);
+  if (!accessToken || !refreshToken) {
+    throw new AuthError("Google kirishidan xavfsiz sessiya olinmadi. Qayta urinib ko‘ring.", "OAUTH_SESSION_MISSING");
+  }
+
+  let userResponse: Response;
+  try {
+    userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: headers(accessToken) });
+  } catch {
+    throw new AuthError("Internet bilan aloqa yo‘q. Ulanishni tekshirib, qayta urinib ko‘ring.", "NETWORK_ERROR");
+  }
+  const user = await parseResponse<AuthUser>(userResponse);
+  const session = await hydrateSessionAccess({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_in: Number.isFinite(expiresIn) ? expiresIn : 3600,
+    expires_at: Number(params.get("expires_at")) || Math.floor(Date.now() / 1000) + (Number.isFinite(expiresIn) ? expiresIn : 3600),
+    token_type: params.get("token_type") ?? "bearer",
+    user
+  });
   await writeSession(session);
   return session;
 }
@@ -195,7 +296,7 @@ export async function signUpWithEmail(email: string, password: string) {
   }
   const result = await parseResponse<Partial<AuthSession> & { user: AuthUser }>(response);
   if (result.access_token && result.refresh_token && result.expires_in && result.token_type) {
-    const session = result as AuthSession;
+    const session = await hydrateSessionAccess(result as AuthSession);
     await writeSession(session);
     return session;
   }
@@ -213,7 +314,7 @@ export async function restoreSession() {
     body: JSON.stringify({ refresh_token: stored.refresh_token })
   });
   if (!response.ok) { await writeSession(null); return null; }
-  const session = await parseResponse<AuthSession>(response);
+  const session = await hydrateSessionAccess(await parseResponse<AuthSession>(response));
   await writeSession(session);
   return session;
 }

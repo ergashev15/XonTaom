@@ -1,8 +1,9 @@
 import { File, Paths } from "expo-file-system";
 import React, { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
-import { catalogApiEnvironment, fetchCatalog, fetchOwnedRestaurant } from "@/api/catalog-api";
+import { catalogApiEnvironment, fetchCatalog, fetchOwnedOrders, fetchOwnedRestaurant } from "@/api/catalog-api";
 import { createServerOrder } from "@/api/order-api";
+import { createOwnedCategory, createOwnedMenuItem, deleteOwnedCategory, deleteOwnedMenuItem, updateOwnedMenuAvailability, updateOwnedMenuItem, updateOwnedOrder, updateOwnedRestaurantHours, updateOwnedRestaurantOpen } from "@/api/owner-api";
 import { useAuth } from "@/auth/auth-context";
 import { campaignsSeed, ordersSeed, restaurantsSeed, reviewsSeed } from "@/data/seed";
 import { AppNotification, Campaign, CartItem, MenuExtra, MenuItem, MenuVariant, Order, OrderStatus, Restaurant, RestaurantApplication, Review, StaffMember } from "@/types";
@@ -80,14 +81,14 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     try {
       const remote = await fetchCatalog();
       const ownerRestaurantId = session?.user.app_metadata?.restaurant_id;
-      const owned = ownerRestaurantId && session?.access_token
-        ? await fetchOwnedRestaurant(ownerRestaurantId, session.access_token)
-        : null;
+      const owned = ownerRestaurantId && session?.access_token ? await fetchOwnedRestaurant(ownerRestaurantId, session.access_token) : null;
+      const ownedOrders = owned && session?.access_token ? await fetchOwnedOrders(owned.id, owned.name, session.access_token) : null;
       const merged = owned ? [owned, ...remote.filter((restaurant) => restaurant.id !== owned.id)] : remote;
       // A newly created server can legitimately have no approved restaurants yet.
       // Keep the built-in catalog usable instead of replacing it with an empty view.
       if (merged.length) {
         setRestaurants(merged);
+        if (ownedOrders && ownerRestaurantId) setOrders((current) => [...ownedOrders, ...current.filter((order) => order.restaurantId !== ownerRestaurantId)]);
         setCatalogStatus({ loading: false, syncing: false, source: "server", lastSyncedAt: new Date().toISOString() });
       } else {
         setCatalogStatus({ loading: false, syncing: false, source: "local", lastSyncedAt: new Date().toISOString() });
@@ -157,6 +158,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearCart = () => { setCart([]); setCartRestaurantId(undefined); };
+
+  const syncOwnerChange = (operation: () => Promise<unknown>) => {
+    void operation().then(() => refreshCatalog()).catch((error) => {
+      setCatalogStatus((current) => ({ ...current, error: error instanceof Error ? error.message : "O‘zgarish serverga saqlanmadi." }));
+      void refreshCatalog();
+    });
+  };
 
   const placeOrder = async (input: CheckoutInput) => {
     const restaurant = restaurants.find((entry) => entry.id === cartRestaurantId);
@@ -231,6 +239,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         deliveredAt: status === "Yetkazildi" ? now : order.deliveredAt
       } : order));
       if (status === "Yetkazishga chiqdi" && selected) setNotifications((current) => [{ id: `${id}-${Date.now()}`, title: "Buyurtma yo‘lda", body: `${selected.restaurantName} buyurtmangizni yetkazishga chiqardi.`, createdAt: now }, ...current]);
+      if (selected?.serverId && session?.access_token) syncOwnerChange(() => updateOwnedOrder(selected.serverId!, status, rejectionReason, session.access_token));
     },
     setPrepMinutes: (id, minutes) => setOrders((current) => current.map((order) => order.id === id ? { ...order, prepMinutes: minutes } : order)),
     reorder: (id) => {
@@ -243,15 +252,44 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       setCartRestaurantId(restaurant.id);
       return true;
     },
-    toggleRestaurant: (id) => setRestaurants((current) => current.map((restaurant) => restaurant.id === id ? { ...restaurant, isOpen: !restaurant.isOpen } : restaurant)),
+    toggleRestaurant: (id) => {
+      const restaurant = restaurants.find((entry) => entry.id === id);
+      if (!restaurant) return;
+      setRestaurants((current) => current.map((entry) => entry.id === id ? { ...entry, isOpen: !entry.isOpen } : entry));
+      if (session?.access_token) syncOwnerChange(() => updateOwnedRestaurantOpen(id, !restaurant.isOpen, session.access_token));
+    },
     toggleBlocked: (id) => setRestaurants((current) => current.map((restaurant) => restaurant.id === id ? { ...restaurant, isBlocked: !restaurant.isBlocked } : restaurant)),
-    toggleMenuItem: (restaurantId, itemId) => setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: restaurant.menu.map((item) => item.id === itemId ? { ...item, available: !item.available } : item) } : restaurant)),
-    addMenuItem: (restaurantId, item) => setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: [...restaurant.menu, { ...item, id: `${restaurantId}-${Date.now()}`, available: (item.stock ?? 1) > 0 }] } : restaurant)),
-    updateMenuItem: (restaurantId, itemId, item) => setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: restaurant.menu.map((entry) => entry.id === itemId ? { ...entry, ...item, available: (item.stock ?? 1) > 0 ? entry.available : false } : entry) } : restaurant)),
-    deleteMenuItem: (restaurantId, itemId) => setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: restaurant.menu.filter((entry) => entry.id !== itemId) } : restaurant)),
-    updateRestaurantHours: (restaurantId, hours) => setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, hours } : restaurant)),
-    addRestaurantCategory: (restaurantId, category) => setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, categories: [...new Set([...(restaurant.categories ?? []), category.trim()])] } : restaurant)),
-    deleteRestaurantCategory: (restaurantId, category) => setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, categories: (restaurant.categories ?? []).filter((entry) => entry !== category) } : restaurant)),
+    toggleMenuItem: (restaurantId, itemId) => {
+      const item = restaurants.find((entry) => entry.id === restaurantId)?.menu.find((entry) => entry.id === itemId);
+      setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: restaurant.menu.map((entry) => entry.id === itemId ? { ...entry, available: !entry.available } : entry) } : restaurant));
+      if (item && session?.access_token) syncOwnerChange(() => updateOwnedMenuAvailability(itemId, !item.available, session.access_token));
+    },
+    addMenuItem: (restaurantId, item) => {
+      setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: [...restaurant.menu, { ...item, id: `${restaurantId}-${Date.now()}`, available: (item.stock ?? 1) > 0 }] } : restaurant));
+      if (session?.access_token) syncOwnerChange(() => createOwnedMenuItem(restaurantId, item, session.access_token));
+    },
+    updateMenuItem: (restaurantId, itemId, item) => {
+      setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: restaurant.menu.map((entry) => entry.id === itemId ? { ...entry, ...item, available: (item.stock ?? 1) > 0 ? entry.available : false } : entry) } : restaurant));
+      if (session?.access_token) syncOwnerChange(() => updateOwnedMenuItem(restaurantId, itemId, item, session.access_token));
+    },
+    deleteMenuItem: (restaurantId, itemId) => {
+      setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, menu: restaurant.menu.filter((entry) => entry.id !== itemId) } : restaurant));
+      if (session?.access_token) syncOwnerChange(() => deleteOwnedMenuItem(itemId, session.access_token));
+    },
+    updateRestaurantHours: (restaurantId, hours) => {
+      setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, hours } : restaurant));
+      if (session?.access_token) syncOwnerChange(() => updateOwnedRestaurantHours(restaurantId, hours, session.access_token));
+    },
+    addRestaurantCategory: (restaurantId, category) => {
+      const clean = category.trim();
+      const sortOrder = restaurants.find((entry) => entry.id === restaurantId)?.categories?.length ?? 0;
+      setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, categories: [...new Set([...(restaurant.categories ?? []), clean])] } : restaurant));
+      if (session?.access_token) syncOwnerChange(() => createOwnedCategory(restaurantId, clean, sortOrder, session.access_token));
+    },
+    deleteRestaurantCategory: (restaurantId, category) => {
+      setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, categories: (restaurant.categories ?? []).filter((entry) => entry !== category) } : restaurant));
+      if (session?.access_token) syncOwnerChange(() => deleteOwnedCategory(restaurantId, category, session.access_token));
+    },
     addCampaign: (campaign) => setCampaigns((current) => [{ ...campaign, id: `campaign-${Date.now()}`, active: true }, ...current]),
     addStaffMember: (member) => setStaff((current) => [{ ...member, id: `staff-${Date.now()}`, active: true }, ...current]),
     toggleStaffMember: (id) => setStaff((current) => current.map((member) => member.id === id ? { ...member, active: !member.active } : member)),
@@ -276,7 +314,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     toggleCampaign: (id) => setCampaigns((current) => current.map((item) => item.id === id ? { ...item, active: !item.active } : item)),
     toggleReview: (id) => setReviews((current) => current.map((item) => item.id === id ? { ...item, visible: !item.visible } : item)),
     sendNotification: (title, body) => setNotifications((current) => [{ id: `notice-${Date.now()}`, title, body, createdAt: new Date().toISOString() }, ...current])
-  }), [restaurants, orders, favorites, cart, cartRestaurantId, campaigns, reviews, notifications, staff, restaurantApplications, catalogStatus, refreshCatalog]);
+  }), [restaurants, orders, favorites, cart, cartRestaurantId, campaigns, reviews, notifications, staff, restaurantApplications, catalogStatus, refreshCatalog, session?.access_token]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

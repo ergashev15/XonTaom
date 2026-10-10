@@ -2,7 +2,7 @@
   "expo": {
     "name": "XonTaom",
     "slug": "xontaom",
-    "version": "1.7.6",
+    "version": "1.7.7",
     "icon": "./assets/xontaom-app-icon.png",
     "orientation": "portrait",
     "scheme": "xontaom",

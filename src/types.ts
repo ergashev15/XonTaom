@@ -87,6 +87,7 @@ export type CartItem = MenuItem & {
 
 export type Order = {
   id: string;
+  serverId?: string;
   restaurantId: string;
   restaurantName: string;
   customerName: string;

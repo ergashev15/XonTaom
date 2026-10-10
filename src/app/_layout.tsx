@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, ActivityIndicator, View } from "react-native";
 import { AuthProvider, useAuth } from "@/auth/auth-context";
-import { authEnvironment, roleOf, routeForRole } from "@/auth/auth-service";
+import { isRegistrationComplete, roleOf, routeForRole } from "@/auth/auth-service";
 import { AppStoreProvider } from "@/store/app-store";
 import { AppThemeProvider, colors, useAppTheme } from "@/theme";
 
@@ -26,12 +26,13 @@ function AppNavigator() {
     const first = String(segments[0] ?? "");
     const protectedRoute = ["home", "restaurants", "dishes", "restaurant", "item", "cart", "checkout", "orders", "profile", "restaurant-panel", "admin-panel"].includes(first);
     if (!session) {
-      if (first === "restaurant-panel" || first === "admin-panel") { router.replace("/staff-access"); return; }
-      if (authEnvironment.isRequired && protectedRoute) router.replace("/");
+      if (protectedRoute) router.replace("/");
       return;
     }
     const role = roleOf(session);
-    if ((role === "restaurant" || role === "admin") && (first === "index" || first === "staff-access")) { router.replace(routeForRole(role)); return; }
+    if (!isRegistrationComplete(session) && first !== "register") { router.replace("/register"); return; }
+    if (isRegistrationComplete(session) && first === "register") { router.replace(routeForRole(role)); return; }
+    if (first === "" || first === "index") { router.replace(routeForRole(role)); return; }
     if ((first === "admin-panel" && role !== "admin") || (first === "restaurant-panel" && role !== "restaurant" && role !== "admin")) router.replace(routeForRole(role));
   }, [ready, session, segments]);
 
@@ -39,7 +40,7 @@ function AppNavigator() {
   return (
     <><StatusBar style={isDark ? "light" : "dark"} /><Stack screenOptions={{ animation: reducedMotion ? "fade" : "default", headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.green, headerTitleStyle: { color: colors.ink, fontWeight: "800" }, headerBackButtonDisplayMode: "minimal", contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="staff-access" options={{ title: "Restoran egasi kirishi", presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.65, 1] }} />
+        <Stack.Screen name="register" options={{ title: "Ro‘yxatdan o‘tish" }} />
         <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="restaurant-application" options={{ title: "Restoran qo‘shish" }} />
         <Stack.Screen name="home" options={{ title: "XonTaom", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />

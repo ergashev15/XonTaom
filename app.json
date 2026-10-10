@@ -2,7 +2,7 @@
   "expo": {
     "name": "XonTaom",
     "slug": "xontaom",
-    "version": "1.7.7",
+    "version": "1.7.9",
     "icon": "./assets/xontaom-app-icon.png",
     "orientation": "portrait",
     "scheme": "xontaom",
@@ -37,7 +37,13 @@
       ],
       "expo-font",
       "expo-asset",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-nitro-google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.566559516343-6e257k55sulka40je39qugfl6oavenab"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,5 +1,6 @@
 import { fetch } from "expo/fetch";
 import * as AuthSessionBrowser from "expo-auth-session";
+import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
@@ -12,8 +13,8 @@ export type AuthUser = {
   id: string;
   phone?: string;
   email?: string;
-  app_metadata?: { role?: UserRole; restaurant_id?: string };
-  user_metadata?: { full_name?: string; name?: string; user_name?: string; avatar_url?: string };
+  app_metadata?: { role?: UserRole; restaurant_id?: string; onboarding_completed?: boolean };
+  user_metadata?: { full_name?: string; first_name?: string; last_name?: string; name?: string; user_name?: string; avatar_url?: string };
 };
 
 export type AuthSession = {
@@ -28,6 +29,7 @@ export type AuthSession = {
 const SESSION_KEY = "xontaom.auth.session.v1";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_AUTH_WEB_CLIENT_ID;
 const DEV_AUTH = __DEV__ && process.env.EXPO_PUBLIC_AUTH_DEV_MODE === "true";
 const AUTH_REQUIRED = process.env.EXPO_PUBLIC_AUTH_REQUIRED === "true";
 
@@ -114,19 +116,31 @@ export function routeForRole(role: UserRole): "/home" | "/restaurant-panel" | "/
   return "/home";
 }
 
-type ProfileAccessRow = { role?: UserRole };
+export function isRegistrationComplete(session: AuthSession) {
+  return session.user.app_metadata?.onboarding_completed === true;
+}
+
+type ProfileAccessRow = {
+  role?: UserRole;
+  name?: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  onboarding_completed?: boolean;
+};
 type OwnedRestaurantRow = { id: string };
 
 async function hydrateSessionAccess(session: AuthSession) {
   if (DEV_AUTH || !SUPABASE_URL || !SUPABASE_KEY) return session;
   const accessHeaders = headers(session.access_token);
   const [profileResponse, restaurantResponse] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/profiles?select=role&id=eq.${session.user.id}&limit=1`, { headers: accessHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/profiles?select=role,name,phone,first_name,last_name,onboarding_completed&id=eq.${session.user.id}&limit=1`, { headers: accessHeaders }),
     fetch(`${SUPABASE_URL}/rest/v1/restaurants?select=id&owner_id=eq.${session.user.id}&order=created_at.asc&limit=1`, { headers: accessHeaders })
   ]);
   const profileRows = await parseResponse<ProfileAccessRow[]>(profileResponse);
   const restaurantRows = await parseResponse<OwnedRestaurantRow[]>(restaurantResponse);
-  const profileRole = profileRows[0]?.role;
+  const profile = profileRows[0];
+  const profileRole = profile?.role;
   const ownedRestaurantId = restaurantRows[0]?.id;
   const role: UserRole = profileRole === "admin" ? "admin" : ownedRestaurantId ? "restaurant" : "customer";
   const { restaurant_id: _previousRestaurantId, ...appMetadata } = session.user.app_metadata ?? {};
@@ -134,9 +148,17 @@ async function hydrateSessionAccess(session: AuthSession) {
     ...session,
     user: {
       ...session.user,
+      phone: profile?.phone || session.user.phone,
+      user_metadata: {
+        ...session.user.user_metadata,
+        ...(profile?.name ? { full_name: profile.name } : {}),
+        ...(profile?.first_name ? { first_name: profile.first_name } : {}),
+        ...(profile?.last_name ? { last_name: profile.last_name } : {})
+      },
       app_metadata: {
         ...appMetadata,
         role,
+        onboarding_completed: profile?.onboarding_completed === true,
         ...(ownedRestaurantId ? { restaurant_id: ownedRestaurantId } : {})
       }
     }
@@ -224,7 +246,7 @@ function oauthCallbackParams(callbackUrl: string) {
   return params;
 }
 
-export async function signInWithGoogle() {
+async function signInWithGoogleBrowser() {
   assertConfigured();
   if (DEV_AUTH) {
     throw new AuthError("Google kirishini haqiqiy server ulanishida sinash mumkin.", "GOOGLE_AUTH_DEV_MODE");
@@ -282,6 +304,137 @@ export async function signInWithGoogle() {
   return session;
 }
 
+async function signInWithGoogleNative() {
+  if (!GOOGLE_WEB_CLIENT_ID) {
+    throw new AuthError("Google native kirishi sozlanmagan. Administratorga murojaat qiling.", "GOOGLE_CLIENT_NOT_CONFIGURED");
+  }
+
+  const {
+    GoogleOneTapSignIn,
+    isCancelledResponse,
+    isErrorWithCode,
+    isNoSavedCredentialFoundResponse,
+    isSuccessResponse,
+    statusCodes
+  } = await import("react-native-nitro-google-signin");
+
+  const nonce = Crypto.randomUUID();
+  const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce);
+  GoogleOneTapSignIn.configure({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    nonce: hashedNonce,
+    autoSelectOnSignIn: false
+  });
+
+  try {
+    await GoogleOneTapSignIn.checkPlayServices();
+    let response = await GoogleOneTapSignIn.signIn();
+    if (isNoSavedCredentialFoundResponse(response)) response = await GoogleOneTapSignIn.createAccount();
+    if (isNoSavedCredentialFoundResponse(response)) response = await GoogleOneTapSignIn.presentExplicitSignIn();
+    if (isCancelledResponse(response)) throw new AuthError("Google orqali kirish bekor qilindi.", "OAUTH_CANCELLED");
+    if (!isSuccessResponse(response) || !response.data.idToken) {
+      throw new AuthError("Google akkauntidan xavfsiz token olinmadi. Qayta urinib ko‘ring.", "GOOGLE_TOKEN_MISSING");
+    }
+
+    const googleTokens = await GoogleOneTapSignIn.getTokens();
+    const tokenResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=id_token`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        provider: "google",
+        id_token: response.data.idToken,
+        access_token: googleTokens.accessToken,
+        nonce
+      })
+    });
+    const session = await hydrateSessionAccess(await parseResponse<AuthSession>(tokenResponse));
+    await writeSession(session);
+    return session;
+  } catch (error) {
+    if (error instanceof AuthError) throw error;
+    if (isErrorWithCode(error)) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        throw new AuthError("Google orqali kirish bekor qilindi.", "OAUTH_CANCELLED");
+      }
+      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        throw new AuthError("Google Play xizmatlari mavjud emas yoki yangilanishi kerak.", "PLAY_SERVICES_NOT_AVAILABLE");
+      }
+      if (error.code === statusCodes.DEVELOPER_ERROR) {
+        throw new AuthError("Google kirish sozlamasi qurilma imzosiga mos emas.", "GOOGLE_OAUTH_CONFIG_ERROR");
+      }
+    }
+    throw new AuthError("Google orqali kirish amalga oshmadi. Internetni tekshirib, qayta urinib ko‘ring.", "GOOGLE_SIGN_IN_FAILED");
+  }
+}
+
+export async function signInWithGoogle() {
+  assertConfigured();
+  if (Platform.OS === "web") return signInWithGoogleBrowser();
+  if (DEV_AUTH) {
+    throw new AuthError("Google kirishini haqiqiy server ulanishida sinash mumkin.", "GOOGLE_AUTH_DEV_MODE");
+  }
+  return signInWithGoogleNative();
+}
+
+export type CustomerRegistrationInput = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  city: string;
+  address: string;
+  house: string;
+  landmark?: string;
+};
+
+export async function completeCustomerRegistration(session: AuthSession, input: CustomerRegistrationInput) {
+  assertConfigured();
+  const verifiedEmail = normalizeEmailAddress(session.user.email ?? "");
+  const requestedEmail = normalizeEmailAddress(input.email);
+  if (!verifiedEmail || verifiedEmail !== requestedEmail) {
+    throw new AuthError("Tanlangan Google akkaunti kiritilgan Gmail manziliga mos kelmadi.", "GOOGLE_EMAIL_MISMATCH");
+  }
+
+  const phone = normalizeUzPhone(input.phone);
+  if (!phone) throw new AuthError("Telefon raqamini +998 bilan to‘liq kiriting.", "INVALID_PHONE");
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/complete_customer_registration`, {
+    method: "POST",
+    headers: headers(session.access_token),
+    body: JSON.stringify({
+      p_first_name: input.firstName.trim(),
+      p_last_name: input.lastName.trim(),
+      p_phone: phone,
+      p_city: input.city.trim(),
+      p_address: input.address.trim(),
+      p_house: input.house.trim(),
+      p_landmark: input.landmark?.trim() || null
+    })
+  });
+  await parseResponse<null>(response);
+
+  const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`;
+  const updatedSession = await hydrateSessionAccess({
+    ...session,
+    user: {
+      ...session.user,
+      phone,
+      user_metadata: {
+        ...session.user.user_metadata,
+        first_name: input.firstName.trim(),
+        last_name: input.lastName.trim(),
+        full_name: fullName
+      },
+      app_metadata: {
+        ...session.user.app_metadata,
+        onboarding_completed: true
+      }
+    }
+  });
+  await writeSession(updatedSession);
+  return updatedSession;
+}
+
 export async function signUpWithEmail(email: string, password: string) {
   assertConfigured();
   let response: Response;
@@ -325,6 +478,10 @@ export async function signOutSession(session: AuthSession | null) {
       await fetch(`${SUPABASE_URL}/auth/v1/logout`, { method: "POST", headers: headers(session.access_token) });
     }
   } finally {
+    if (Platform.OS !== "web") {
+      const { GoogleOneTapSignIn } = await import("react-native-nitro-google-signin");
+      await GoogleOneTapSignIn.signOut().catch(() => undefined);
+    }
     await writeSession(null);
   }
 }

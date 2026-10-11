@@ -1,4 +1,5 @@
 import { fetch } from "expo/fetch";
+import { ensurePublicImage } from "@/api/storage-api";
 import type { NewMenuItemInput } from "@/store/app-store";
 import type { OrderStatus } from "@/types";
 
@@ -39,14 +40,32 @@ const orderStatus: Record<OrderStatus, string> = {
   "Bekor qilindi": "cancelled"
 };
 
-async function categoryId(restaurantId: string, name: string, accessToken: string) {
+async function findCategoryId(restaurantId: string, name: string, accessToken: string) {
+  // Category names are unique per restaurant regardless of letter case.
   const rows = await request(
-    `categories?select=id&restaurant_id=eq.${encodeURIComponent(restaurantId)}&name=eq.${encodeURIComponent(name)}&limit=1`,
+    `categories?select=id&restaurant_id=eq.${encodeURIComponent(restaurantId)}&name=ilike.${encodeURIComponent(name.trim().replace(/[%_*\\]/g, "\\$&"))}&limit=1`,
     accessToken,
     { method: "GET" }
   ) as { id: string }[];
-  if (!rows[0]?.id) throw new Error(`“${name}” kategoriyasi serverda topilmadi.`);
-  return rows[0].id;
+  return rows[0]?.id;
+}
+
+async function categoryId(restaurantId: string, name: string, accessToken: string) {
+  const id = await findCategoryId(restaurantId, name, accessToken);
+  if (!id) throw new Error(`“${name}” kategoriyasi serverda topilmadi.`);
+  return id;
+}
+
+// A dish can be saved under a category typed for the first time.
+async function ensureCategoryId(restaurantId: string, name: string, accessToken: string) {
+  const existing = await findCategoryId(restaurantId, name, accessToken);
+  if (existing) return existing;
+  const created = await request("categories?select=id", accessToken, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ restaurant_id: restaurantId, name: name.trim() })
+  }) as { id: string }[];
+  return created[0].id;
 }
 
 export function updateOwnedRestaurantOpen(restaurantId: string, isOpen: boolean, accessToken: string) {
@@ -55,6 +74,10 @@ export function updateOwnedRestaurantOpen(restaurantId: string, isOpen: boolean,
 
 export function updateOwnedMenuAvailability(itemId: string, available: boolean, accessToken: string) {
   return request(`menu_items?id=eq.${encodeURIComponent(itemId)}`, accessToken, { method: "PATCH", body: JSON.stringify({ is_available: available }) });
+}
+
+export function updateRestaurantBlocked(restaurantId: string, isBlocked: boolean, accessToken: string) {
+  return request(`restaurants?id=eq.${encodeURIComponent(restaurantId)}`, accessToken, { method: "PATCH", body: JSON.stringify({ is_blocked: isBlocked }) });
 }
 
 function menuPayload(restaurantId: string, category: string, categoryIdValue: string, item: NewMenuItemInput) {
@@ -71,14 +94,18 @@ function menuPayload(restaurantId: string, category: string, categoryIdValue: st
   };
 }
 
-export async function createOwnedMenuItem(restaurantId: string, item: NewMenuItemInput, accessToken: string) {
-  const category = await categoryId(restaurantId, item.category, accessToken);
-  return request("menu_items", accessToken, { method: "POST", body: JSON.stringify(menuPayload(restaurantId, item.category, category, item)) });
+export async function createOwnedMenuItem(restaurantId: string, item: NewMenuItemInput, ownerId: string, accessToken: string) {
+  const category = await ensureCategoryId(restaurantId, item.category, accessToken);
+  const image = await ensurePublicImage(item.image, ownerId, "menu", accessToken);
+  return request("menu_items", accessToken, { method: "POST", body: JSON.stringify(menuPayload(restaurantId, item.category, category, { ...item, image })) });
 }
 
-export async function updateOwnedMenuItem(restaurantId: string, itemId: string, item: NewMenuItemInput, accessToken: string) {
-  const category = await categoryId(restaurantId, item.category, accessToken);
-  return request(`menu_items?id=eq.${encodeURIComponent(itemId)}`, accessToken, { method: "PATCH", body: JSON.stringify(menuPayload(restaurantId, item.category, category, item)) });
+export async function updateOwnedMenuItem(restaurantId: string, itemId: string, item: NewMenuItemInput, ownerId: string, accessToken: string) {
+  const category = await ensureCategoryId(restaurantId, item.category, accessToken);
+  const image = await ensurePublicImage(item.image, ownerId, "menu", accessToken);
+  const { is_available: inStock, ...payload } = menuPayload(restaurantId, item.category, category, { ...item, image });
+  // Editing a dish must not put a paused dish back on sale; only running out of stock changes availability.
+  return request(`menu_items?id=eq.${encodeURIComponent(itemId)}`, accessToken, { method: "PATCH", body: JSON.stringify(inStock ? payload : { ...payload, is_available: false }) });
 }
 
 export function deleteOwnedMenuItem(itemId: string, accessToken: string) {
@@ -86,17 +113,15 @@ export function deleteOwnedMenuItem(itemId: string, accessToken: string) {
 }
 
 export function updateOwnedOrder(serverId: string, status: OrderStatus, rejectionReason: string | undefined, accessToken: string) {
-  const now = new Date().toISOString();
+  // accepted_at and delivered_at are stamped by the database when the status changes.
   const payload = {
     status: orderStatus[status],
-    rejection_reason: status === "Rad etildi" ? rejectionReason?.trim() || "Sabab ko‘rsatilmagan" : null,
-    ...(status === "Qabul qilindi" ? { accepted_at: now } : {}),
-    ...(status === "Yetkazildi" ? { delivered_at: now } : {})
+    rejection_reason: status === "Rad etildi" ? rejectionReason?.trim() || "Sabab ko‘rsatilmagan" : null
   };
   return request(`orders?id=eq.${encodeURIComponent(serverId)}`, accessToken, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
-function parseHours(value: string) {
+export function parseHours(value: string) {
   const match = value.trim().match(/^([01]\d|2[0-3]):([0-5]\d)\s*[–-]\s*([01]\d|2[0-3]):([0-5]\d)$/);
   if (!match) throw new Error("Ish vaqtini 09:00–23:00 ko‘rinishida kiriting.");
   return { opens_at: `${match[1]}:${match[2]}:00`, closes_at: `${match[3]}:${match[4]}:00` };

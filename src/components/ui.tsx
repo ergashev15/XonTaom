@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Link, router as expoRouter } from "expo-router";
 import React, { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, TextStyle, View, ViewStyle, useWindowDimensions, type GestureResponderEvent, type Insets } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleProp, Text, TextInput, TextInputProps, TextStyle, View, ViewStyle, useWindowDimensions, type GestureResponderEvent, type Insets } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
 import { breakpoints, colors, layout, money, radius, shadow, spacing, type, useAppTheme } from "@/theme";
@@ -152,7 +152,8 @@ export function Row({ icon, title, subtitle, right, onPress }: { icon?: keyof ty
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const motionStyles = StyleSheet.create({
-  base: { transform: [{ scale: 1 }], transitionProperty: "transform", transitionDuration: "120ms", transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1) as unknown as Function },
+// Reanimated CSS transition properties are not part of React Native's StyleSheet types.
+const motionStyles = {
+  base: { transform: [{ scale: 1 }], transitionProperty: "transform", transitionDuration: "120ms", transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1) },
   pressed: { transform: [{ scale: 0.97 }] }
-});
+};

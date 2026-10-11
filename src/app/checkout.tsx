@@ -1,20 +1,51 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
+import { catalogApiEnvironment } from "@/api/catalog-api";
+import { fetchAddresses } from "@/api/account-api";
+import { useAuth } from "@/auth/auth-context";
+import { formatUzPhone } from "@/auth/auth-service";
 import { AppText, Button, Card, Chip, CustomerShell, Field, Screen, useResponsiveLayout } from "@/components/ui";
 import { useAppStore } from "@/store/app-store";
 import { colors, money, spacing } from "@/theme";
-import { Order } from "@/types";
+import { Order, SavedAddress } from "@/types";
 import { cartUnitPrice } from "@/utils/order-rules";
 
 export default function CheckoutScreen() {
   const { cart, cartRestaurant, placeOrder } = useAppStore();
   const { isDesktop } = useResponsiveLayout();
-  const [name, setName] = useState("Dilshod Karimov");
-  const [phone, setPhone] = useState("+998 90 123 45 67");
+  const { session } = useAuth();
+  // Sample contact details are only for the offline demo; real orders start from the account.
+  const demo = !catalogApiEnvironment.isConfigured;
+  const [name, setName] = useState(session?.user.user_metadata?.full_name ?? (demo ? "Dilshod Karimov" : ""));
+  const [phone, setPhone] = useState(session?.user.phone ? formatUzPhone(session.user.phone) : demo ? "+998 90 123 45 67" : "+998 ");
   const [address, setAddress] = useState("");
   const [house, setHouse] = useState("");
   const [landmark, setLandmark] = useState("");
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>();
+  const accessToken = session?.access_token;
+
+  const addressRef = useRef(address);
+  addressRef.current = address;
+
+  const applyAddress = (saved: SavedAddress) => {
+    setSelectedAddressId(saved.id);
+    setAddress(saved.address);
+    setHouse(saved.house);
+    setLandmark(saved.landmark);
+  };
+
+  useEffect(() => {
+    if (!accessToken || demo) return;
+    const controller = new AbortController();
+    fetchAddresses(accessToken, controller.signal).then((saved) => {
+      setSavedAddresses(saved);
+      // Prefill with the main address unless the customer has already started typing.
+      if (saved[0] && !addressRef.current) applyAddress(saved[0]);
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [accessToken, demo]);
   const [note, setNote] = useState("");
   const [payment, setPayment] = useState<Order["payment"]>("Naqd");
   const [error, setError] = useState("");
@@ -34,7 +65,7 @@ export default function CheckoutScreen() {
     } finally { setPending(false); }
   };
 
-  const form = <View style={{ gap: spacing.md }}><Card><AppText variant="heading">Aloqa ma’lumotlari</AppText><Field label="Ismingiz" value={name} onChangeText={setName} /><Field label="Telefon raqami" keyboardType="phone-pad" value={phone} onChangeText={setPhone} /></Card><Card><AppText variant="heading">Yetkazish manzili</AppText><Field label="Ko‘cha / MFY" value={address} onChangeText={setAddress} placeholder="Masalan: Mustaqillik ko‘chasi" /><Field label="Uy raqami" value={house} onChangeText={setHouse} placeholder="42" /><Field label="Mo‘ljal" value={landmark} onChangeText={setLandmark} placeholder="Maktab ro‘parasida" /><Field label="Buyurtma izohi" value={note} onChangeText={setNote} placeholder="Kuryer uchun qo‘shimcha izoh" multiline style={{ minHeight: 86, paddingTop: 14 }} /><Button title="Xaritadan belgilash (demo)" variant="ghost" icon="map-outline" onPress={() => setAddress("Xonobod markazi, Amir Temur ko‘chasi")} /></Card><Card><AppText variant="heading">To‘lov usuli</AppText><View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}><Chip label="Naqd" active={payment === "Naqd"} onPress={() => setPayment("Naqd")} /><Chip label="Yetkazilganda karta orqali" active={payment === "Yetkazilganda karta orqali"} onPress={() => setPayment("Yetkazilganda karta orqali")} /></View></Card></View>;
+  const form = <View style={{ gap: spacing.md }}><Card><AppText variant="heading">Aloqa ma’lumotlari</AppText><Field label="Ismingiz" value={name} onChangeText={setName} /><Field label="Telefon raqami" keyboardType="phone-pad" value={phone} onChangeText={setPhone} /></Card><Card><AppText variant="heading">Yetkazish manzili</AppText>{savedAddresses.length > 1 ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>{savedAddresses.map((saved) => <Chip key={saved.id} label={saved.label} active={selectedAddressId === saved.id} onPress={() => applyAddress(saved)} />)}</View> : null}<Field label="Ko‘cha / MFY" value={address} onChangeText={setAddress} placeholder="Masalan: Mustaqillik ko‘chasi" /><Field label="Uy raqami" value={house} onChangeText={setHouse} placeholder="42" /><Field label="Mo‘ljal" value={landmark} onChangeText={setLandmark} placeholder="Maktab ro‘parasida" /><Field label="Buyurtma izohi" value={note} onChangeText={setNote} placeholder="Kuryer uchun qo‘shimcha izoh" multiline style={{ minHeight: 86, paddingTop: 14 }} /><Button title="Xaritadan belgilash (demo)" variant="ghost" icon="map-outline" onPress={() => setAddress("Xonobod markazi, Amir Temur ko‘chasi")} /></Card><Card><AppText variant="heading">To‘lov usuli</AppText><View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}><Chip label="Naqd" active={payment === "Naqd"} onPress={() => setPayment("Naqd")} /><Chip label="Yetkazilganda karta orqali" active={payment === "Yetkazilganda karta orqali"} onPress={() => setPayment("Yetkazilganda karta orqali")} /></View></Card></View>;
   const summary = <View style={{ gap: spacing.md }}><Card><AppText variant="heading">Buyurtma xulosasi</AppText><View style={{ gap: spacing.sm }}><AppText color={colors.muted}>{cartRestaurant?.name}</AppText><AppText color={colors.orange}>Taxminiy yetib kelish: {cartRestaurant?.eta}</AppText>{cart.map((item) => <View key={item.lineId} style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}><AppText style={{ flex: 1 }}>{item.quantity} × {item.name}</AppText><AppText>{money(cartUnitPrice(item) * item.quantity)}</AppText></View>)}<View style={{ height: 1, backgroundColor: colors.line }} /><AppText>Taomlar: {money(subtotal)}</AppText><AppText>Yetkazish: {money(cartRestaurant?.deliveryFee ?? 0)}</AppText><AppText variant="title" color={colors.green}>Jami: {money(subtotal + (cartRestaurant?.deliveryFee ?? 0))}</AppText></View></Card>{error ? <Card style={{ backgroundColor: colors.redSoft }}><AppText selectable color={colors.red}>{error}</AppText></Card> : null}<Button title="Buyurtmani tasdiqlash" size="lg" icon="checkmark-circle-outline" loading={pending} disabled={pending} onPress={submit} /></View>;
 
   return <CustomerShell active="cart" cartCount={cartCount}><Screen style={{ paddingBottom: isDesktop ? spacing.xxl : 118 }}><View><AppText variant="title">Buyurtmani rasmiylashtirish</AppText><AppText color={colors.muted}>Ma’lumotlarni tekshiring va buyurtmani tasdiqlang.</AppText></View><View style={{ flexDirection: isDesktop ? "row" : "column", alignItems: "flex-start", gap: spacing.lg }}><View style={{ flex: isDesktop ? 1.45 : undefined, width: isDesktop ? undefined : "100%" }}>{form}</View><View style={{ flex: isDesktop ? 1 : undefined, width: isDesktop ? undefined : "100%" }}>{summary}</View></View></Screen></CustomerShell>;

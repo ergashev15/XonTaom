@@ -492,20 +492,53 @@ export async function signUpWithEmail(email: string, password: string) {
   return null;
 }
 
+let refreshInFlight: Promise<AuthSession | null> | null = null;
+
+function withExpiry(session: AuthSession): AuthSession {
+  return session.expires_at ? session : { ...session, expires_at: Math.floor(Date.now() / 1000) + (session.expires_in || 3600) };
+}
+
+// Exchanges the refresh token for a new access token. Returns null only when the
+// server rejects the refresh token; network and server failures throw so the
+// caller can keep the stored session and retry.
+export function refreshSession(current: AuthSession): Promise<AuthSession | null> {
+  if (DEV_AUTH) return Promise.resolve(current);
+  // Refresh tokens rotate, so concurrent callers must share one request.
+  refreshInFlight ??= (async () => {
+    let response: Response;
+    try {
+      response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ refresh_token: current.refresh_token })
+      });
+    } catch {
+      throw new AuthError("Internet bilan aloqa yo‘q. Ulanishni tekshirib, qayta urinib ko‘ring.", "NETWORK_ERROR");
+    }
+    if ([400, 401, 403].includes(response.status)) { await writeSession(null); return null; }
+    const refreshed = withExpiry(await parseResponse<AuthSession>(response));
+    // Persist the rotated tokens before anything else can fail; the previous
+    // refresh token stops working once this response has been issued.
+    await writeSession({ ...refreshed, user: current.user });
+    const session = await hydrateSessionAccess(refreshed);
+    await writeSession(session);
+    return session;
+  })().finally(() => { refreshInFlight = null; });
+  return refreshInFlight;
+}
+
 export async function restoreSession() {
   assertConfigured();
   const stored = await readSession();
   if (!stored) return null;
   if (DEV_AUTH) return stored;
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ refresh_token: stored.refresh_token })
-  });
-  if (!response.ok) { await writeSession(null); return null; }
-  const session = await hydrateSessionAccess(await parseResponse<AuthSession>(response));
-  await writeSession(session);
-  return session;
+  try {
+    return await refreshSession(stored);
+  } catch {
+    // Offline or a temporary server failure: stay signed in and let the
+    // scheduled refresh retry instead of logging the user out.
+    return stored;
+  }
 }
 
 export async function signOutSession(session: AuthSession | null) {

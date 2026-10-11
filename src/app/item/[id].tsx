@@ -2,11 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText, EmptyState, PressableScale } from "@/components/ui";
 import { useAppStore } from "@/store/app-store";
 import { colors, money, radius, shadow, spacing } from "@/theme";
+import { confirmAction } from "@/utils/dialogs";
 
 export default function ItemOptionsScreen() {
   const { id, restaurantId } = useLocalSearchParams<{ id: string; restaurantId: string }>();
@@ -27,7 +28,7 @@ export default function ItemOptionsScreen() {
 
   const submit = () => {
     if (!addToCart(restaurant.id, item, quantity, note, selectedExtras, selectedVariant)) {
-      Alert.alert("Savatchada boshqa restoran bor", "Avvalgi savatchani yakunlang yoki tozalang.", [{ text: "Yopish" }, { text: "Savatchaga o‘tish", onPress: () => router.replace("/cart") }]);
+      confirmAction({ title: "Savatchada boshqa restoran bor", message: "Avvalgi savatchani yakunlang yoki tozalang.", confirmLabel: "Savatchaga o‘tish", cancelLabel: "Yopish", onConfirm: () => router.replace("/cart") });
       return;
     }
     router.back();

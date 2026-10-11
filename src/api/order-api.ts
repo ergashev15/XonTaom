@@ -13,6 +13,8 @@ type OrderInput = {
   address: string;
   note: string;
   items: CartItem[];
+  // Stays the same across retries of one checkout so the server creates a single order.
+  requestId: string;
 };
 
 type CreatedOrder = { id: string; order_number: number; created_at: string };
@@ -28,7 +30,8 @@ export async function createServerOrder(input: OrderInput) {
       p_address_snapshot: { address: input.address },
       p_customer_snapshot: { name: input.name, phone: input.phone },
       p_note: input.note,
-      p_items: input.items.map((item) => ({ menu_item_id: item.id, quantity: item.quantity, note: item.note ?? "" }))
+      p_items: input.items.map((item) => ({ menu_item_id: item.id, quantity: item.quantity, note: item.note ?? "" })),
+      p_client_request_id: input.requestId
     })
   });
   const body = await response.json().catch(() => null) as CreatedOrder[] | { message?: string; hint?: string } | null;
@@ -39,4 +42,20 @@ export async function createServerOrder(input: OrderInput) {
   const created = Array.isArray(body) ? body[0] : null;
   if (!created) throw new Error("Server buyurtma raqamini qaytarmadi.");
   return created;
+}
+
+export async function cancelServerOrder(serverId: string, accessToken: string) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error("Buyurtma serveri sozlanmagan.");
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${encodeURIComponent(serverId)}&select=id`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${accessToken}`, Prefer: "return=representation" },
+    body: JSON.stringify({ status: "cancelled" })
+  });
+  const body = await response.json().catch(() => null) as { id: string }[] | { message?: string; hint?: string } | null;
+  if (!response.ok) {
+    const failure = body && !Array.isArray(body) ? body : null;
+    throw new Error(failure?.message || failure?.hint || "Buyurtma bekor qilinmadi.");
+  }
+  // No updated row means the restaurant has already answered the order.
+  if (!Array.isArray(body) || !body.length) throw new Error("Restoran buyurtmani qabul qilib bo‘lgan. Bekor qilish uchun restoranga qo‘ng‘iroq qiling.");
 }

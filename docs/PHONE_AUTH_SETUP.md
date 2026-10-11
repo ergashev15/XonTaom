@@ -5,7 +5,7 @@ Ilovadagi OTP oqimi tayyor. Real SMS yuborilishi uchun Supabase loyihasi va SMS 
 ## 1. Supabase loyihasi
 
 1. Supabase'da loyiha yarating.
-2. `supabase/phone-auth.sql` faylini SQL Editor'da bajaring.
+2. `supabase/migrations/` papkasidagi migrationlarni tartib bilan qo‘llang (profil jadvali va yangi foydalanuvchi triggeri shu yerda yaratiladi).
 3. Authentication → Providers → Phone bo‘limida telefon provayderini yoqing.
 4. Supabase qo‘llaydigan SMS provayderlardan birini ulang yoki mahalliy SMS xizmati uchun Send SMS Hook yarating.
 5. Authentication rate limit va CAPTCHA sozlamalarini production uchun yoqing.
@@ -24,7 +24,13 @@ Publishable key mobil ilovada ishlatish uchun mo‘ljallangan. `service_role` yo
 
 ## 3. Rollar
 
-Yangi telefon raqami avtomatik `customer` bo‘ladi. Restoran va administrator rollari faqat ishonchli server yoki Supabase SQL Editor orqali `auth.users.raw_app_meta_data` ga yoziladi. Tayyor namunalar `supabase/phone-auth.sql` oxirida bor.
+Yangi foydalanuvchi avtomatik `customer` bo‘ladi. Administrator roli faqat Supabase SQL Editor yoki ishonchli server orqali beriladi:
+
+```sql
+update public.profiles set role = 'admin' where phone = '+998901234567';
+```
+
+Restoran roli alohida berilmaydi: foydalanuvchi `restaurants.owner_id` orqali restoranga bog‘langan bo‘lsa, ilova uni restoran egasi deb oladi. Foydalanuvchilar o‘z `role` ustunini REST API orqali o‘zgartira olmaydi (`0005_security_hardening.sql`).
 
 Ilova quyidagicha yo‘naltiradi:
 
@@ -32,7 +38,7 @@ Ilova quyidagicha yo‘naltiradi:
 - `restaurant` → `/restaurant-panel`
 - `admin` → `/admin-panel`
 
-Ekrandagi rol tugmasi ruxsat bermaydi; haqiqiy ruxsat server qaytargan `app_metadata.role` bilan belgilanadi.
+Ekrandagi yo‘naltirish ruxsat bermaydi; haqiqiy ruxsatni serverdagi RLS siyosatlari belgilaydi.
 
 ## 4. Lokal sinov
 

@@ -12,6 +12,13 @@ Ishga tushirishdan oldin Supabase bazasiga quyidagi migrationlarni ketma-ket qo�
 
 1. `supabase/migrations/0001_initial.sql`
 2. `supabase/migrations/0002_restaurant_portal.sql`
+3. `supabase/migrations/0003_harden_partner_approval.sql`
+4. `supabase/migrations/0004_customer_registration.sql`
+5. `supabase/migrations/0005_security_hardening.sql`
+6. `supabase/migrations/0006_integrity_and_partner_data.sql`
+7. `supabase/migrations/0007_schedule_order_expiry.sql`
+
+Ilovaning joriy versiyasi `0005` migrationisiz buyurtma yubora olmaydi: `place_order` funksiyasi takroriy yuborishdan himoya qiluvchi `p_client_request_id` parametrini kutadi.
 
 Keyin portal konfiguratsiyasini yarating va statik serverni ishga tushiring:
 
@@ -39,11 +46,9 @@ npm run start
 - Web: `npm run web`, so‘ng bosh sahifadan kerakli rolni tanlang.
 - Tekshiruv: `npm run typecheck && npm test`.
 
-Ushbu kompyuterda Node/npm mavjud bo‘lmagani uchun paketlarni o‘rnatish va runtime tekshiruvi bajarilmadi.
-
 ## Telefon orqali kirish
 
-Ilova Supabase Phone OTP bilan real SMS orqali kirishga tayyor. Sessiya Android/iOS qurilmada `expo-secure-store` yordamida saqlanadi, foydalanuvchi roli esa xavfsiz `app_metadata` qiymatidan olinadi.
+Kirish ekranlari hozir email/parol va Google orqali ishlaydi. Supabase Phone OTP uchun servis funksiyalari (`requestPhoneOtp`, `verifyPhoneOtp`) tayyor, lekin hali ekranga ulanmagan. Sessiya Android/iOS qurilmada `expo-secure-store` yordamida saqlanadi va access token muddati tugashidan oldin avtomatik yangilanadi. Foydalanuvchi roli `profiles.role` va `restaurants.owner_id` asosida aniqlanadi; haqiqiy ruxsatlarni RLS belgilaydi.
 
 Sozlash qo‘llanmasi: [docs/PHONE_AUTH_SETUP.md](docs/PHONE_AUTH_SETUP.md).
 
@@ -59,11 +64,17 @@ Google provider va redirect manzillarini yoqish: [docs/GOOGLE_AUTH_SETUP.md](doc
 - Restoran: ochiq/yopiq holati, yangi buyurtmani qabul qilish/rad etish, holatni yangilash, menyu mavjudligi va ko‘rsatkichlar.
 - Administrator: restoranlar, buyurtmalar, mijozlar, komissiya va moderatsiya ko‘rsatkichlari.
 
-Buyurtma va restoran demo ma’lumotlari hozircha lokal holatda ishlaydi. Ilova qayta yuklanganda boshlang‘ich holat tiklanadi.
+Supabase sozlanmagan bo‘lsa (`.env` yo‘q), ilova ichki demo ma’lumotlari bilan lokal ishlaydi. Supabase sozlanganda buyurtmalar faqat serverda yaratiladi va mijoz, restoran hamda administrator ularni serverdan oladi; server bilan aloqa bo‘lmasa buyurtma yuborilmaydi.
+
+Sevimlilar, manzillar, sharh va baholar, restoran arizalari, aksiyalar va xodimlar ro‘yxati ham serverda saqlanadi (`0006` migrationi). Hali faqat qurilmada ishlaydigan qism: restoran va administrator yuboradigan bildirishnomalar (push ulanmagan).
+
+Javobsiz qolgan buyurtmalar 10 daqiqadan keyin avtomatik bekor qilinadi (`0007` migrationi `pg_cron` ni yoqadi va har daqiqa ishlaydigan vazifani yaratadi). Restoran ish vaqti `Asia/Tashkent` vaqti bo‘yicha serverda tekshiriladi.
+
+Restoran egalari yaratgan yoki tahrirlagan restoran va taomlar administrator panelidagi “Moderatsiya” bo‘limida tasdiqlanmaguncha mijozlarga ko‘rinmaydi.
 
 ## Production backendga o‘tish
 
-Supabase Phone OTP va asosiy profil RLS sxemasi ulangan. Keyingi bosqichda `src/store/app-store.tsx` dagi buyurtma amallari API repository bilan almashtiriladi. Expo push tokenlari va rasmlarni serverda siqish server tomonda ulanadi. Maxfiy kalitlar faqat server muhitida saqlanadi.
+Auth, katalog, buyurtma yaratish/kuzatish/bekor qilish, restoran paneli va menyu rasmlarini Storage’ga yuklash Supabase bilan ishlaydi. Keyingi bosqichlar: promo-kodlarni narxga qo‘llash, Realtime, Expo push bildirishnomalari, release imzo kaliti va EAS build. Maxfiy kalitlar faqat server muhitida saqlanadi.
 
 To‘liq MVP scope, oqimlar, ekranlar, DB sxemasi va roadmap: [docs/MVP.md](docs/MVP.md).
 # XonTaom

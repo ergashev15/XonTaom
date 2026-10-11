@@ -24,7 +24,7 @@ function AppNavigator() {
   useEffect(() => {
     if (!ready) return;
     const first = String(segments[0] ?? "");
-    const protectedRoute = ["home", "restaurants", "dishes", "restaurant", "item", "cart", "checkout", "orders", "profile", "restaurant-panel", "admin-panel"].includes(first);
+    const protectedRoute = ["home", "restaurants", "dishes", "restaurant", "item", "cart", "checkout", "orders", "profile", "addresses", "restaurant-panel", "admin-panel"].includes(first);
     if (!session) {
       if (protectedRoute) router.replace("/");
       return;
@@ -54,6 +54,7 @@ function AppNavigator() {
         <Stack.Screen name="checkout" options={{ title: "Buyurtmani rasmiylashtirish" }} />
         <Stack.Screen name="orders" options={{ title: "Buyurtmalarim", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />
         <Stack.Screen name="profile" options={{ title: "Profil", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />
+        <Stack.Screen name="addresses" options={{ title: "Manzillarim" }} />
         <Stack.Screen name="restaurant-panel" options={{ title: "Restoran paneli" }} />
         <Stack.Screen name="admin-panel" options={{ title: "Administrator paneli" }} />
       </Stack></>

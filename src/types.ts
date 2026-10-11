@@ -8,6 +8,8 @@ export type OrderStatus =
   | "Rad etildi"
   | "Bekor qilindi";
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export type MenuItem = {
   id: string;
   category: string;
@@ -21,6 +23,9 @@ export type MenuItem = {
   prepMinutes?: number;
   stock?: number;
   discountPercent?: number;
+  // Only loaded for the owner and administrators; customers never receive unapproved items.
+  approvalStatus?: ApprovalStatus;
+  rejectionReason?: string;
 };
 
 export type MenuExtra = { id: string; name: string; price: number };
@@ -69,6 +74,8 @@ export type Restaurant = {
   hours: string;
   isOpen: boolean;
   isBlocked?: boolean;
+  approvalStatus?: ApprovalStatus;
+  rejectionReason?: string;
   minOrder: number;
   deliveryFee: number;
   eta: string;
@@ -88,6 +95,7 @@ export type CartItem = MenuItem & {
 export type Order = {
   id: string;
   serverId?: string;
+  customerId?: string;
   restaurantId: string;
   restaurantName: string;
   customerName: string;
@@ -128,6 +136,16 @@ export type Review = {
   comment: string;
   visible: boolean;
   reply?: string;
+  orderId?: string;
+  customerId?: string;
+};
+
+export type SavedAddress = {
+  id: string;
+  label: string;
+  address: string;
+  house: string;
+  landmark: string;
 };
 
 export type AppNotification = {

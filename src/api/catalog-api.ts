@@ -1,5 +1,5 @@
 import { fetch } from "expo/fetch";
-import type { CartItem, MenuItem, Order, OrderStatus, Restaurant } from "@/types";
+import type { ApprovalStatus, CartItem, MenuItem, Order, OrderStatus, Restaurant } from "@/types";
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -17,10 +17,13 @@ type RestaurantRow = {
   delivery_fee: number;
   eta_min: number;
   commission_rate: number;
+  approval_status?: ApprovalStatus;
+  rejection_reason?: string | null;
 };
 
 type CategoryRow = { id: string; restaurant_id: string; name: string; sort_order: number };
 type RestaurantHoursRow = { restaurant_id: string; weekday: number; opens_at: string | null; closes_at: string | null; is_closed: boolean };
+type RatingRow = { restaurant_id: string; rating: number; reviews: number };
 type MenuItemRow = {
   id: string;
   restaurant_id: string;
@@ -32,6 +35,8 @@ type MenuItemRow = {
   is_available: boolean;
   stock: number | null;
   prep_minutes: number;
+  approval_status?: ApprovalStatus;
+  rejection_reason?: string | null;
 };
 
 export const catalogApiEnvironment = { isConfigured: Boolean(SUPABASE_URL && SUPABASE_KEY) };
@@ -50,7 +55,14 @@ async function readRows<T>(path: string, signal?: AbortSignal, accessToken?: str
   return body as T;
 }
 
-function mapCatalog(restaurants: RestaurantRow[], categories: CategoryRow[], menuItems: MenuItemRow[], hours: RestaurantHoursRow[] = []) {
+// Ratings come from a view added in a later migration; the catalog must still
+// load if it is missing or temporarily unavailable.
+function readRatings(signal?: AbortSignal) {
+  return readRows<RatingRow[]>("restaurant_ratings?select=restaurant_id,rating,reviews", signal).catch(() => [] as RatingRow[]);
+}
+
+function mapCatalog(restaurants: RestaurantRow[], categories: CategoryRow[], menuItems: MenuItemRow[], hours: RestaurantHoursRow[] = [], ratings: RatingRow[] = []) {
+  const ratingByRestaurant = new Map(ratings.map((entry) => [entry.restaurant_id, entry]));
   const categoriesById = new Map(categories.map((category) => [category.id, category]));
   const menuByRestaurant = new Map<string, MenuItem[]>();
   for (const row of menuItems) {
@@ -63,25 +75,33 @@ function mapCatalog(restaurants: RestaurantRow[], categories: CategoryRow[], men
       image: row.image_url ?? "",
       available: row.is_available && (row.stock === null || row.stock > 0),
       stock: row.stock ?? undefined,
-      prepMinutes: row.prep_minutes
+      prepMinutes: row.prep_minutes,
+      approvalStatus: row.approval_status,
+      rejectionReason: row.rejection_reason ?? undefined
     };
     menuByRestaurant.set(row.restaurant_id, [...(menuByRestaurant.get(row.restaurant_id) ?? []), item]);
   }
 
+  // restaurant_hours.weekday follows JavaScript's Date#getDay (0 = Sunday).
+  const weekday = new Date().getDay();
   return restaurants.map((row) => {
-    const openHours = hours.find((entry) => entry.restaurant_id === row.id && !entry.is_closed && entry.opens_at && entry.closes_at);
+    const today = hours.find((entry) => entry.restaurant_id === row.id && entry.weekday === weekday);
+    const openHours = today && !today.is_closed && today.opens_at && today.closes_at ? today : undefined;
     return ({
     id: row.id,
     name: row.name,
     cuisine: row.cuisine,
-    rating: 5,
-    reviews: 0,
+    // Restaurants without reviews yet keep the neutral starting score.
+    rating: Number(ratingByRestaurant.get(row.id)?.rating ?? 5),
+    reviews: ratingByRestaurant.get(row.id)?.reviews ?? 0,
     image: row.image_url ?? "",
     phone: row.phone,
     address: row.address,
-    hours: openHours ? `${openHours.opens_at!.slice(0, 5)}–${openHours.closes_at!.slice(0, 5)}` : "Ish vaqtini restorandan aniqlang",
+    hours: openHours ? `${openHours.opens_at!.slice(0, 5)}–${openHours.closes_at!.slice(0, 5)}` : today?.is_closed ? "Bugun yopiq" : "Ish vaqtini restorandan aniqlang",
     isOpen: row.is_open,
     isBlocked: row.is_blocked,
+    approvalStatus: row.approval_status,
+    rejectionReason: row.rejection_reason ?? undefined,
     minOrder: Number(row.min_order),
     deliveryFee: Number(row.delivery_fee),
     eta: `${row.eta_min}–${row.eta_min + 15} daqiqa`,
@@ -94,33 +114,49 @@ function mapCatalog(restaurants: RestaurantRow[], categories: CategoryRow[], men
 
 export async function fetchCatalog(signal?: AbortSignal): Promise<Restaurant[]> {
   if (!catalogApiEnvironment.isConfigured) return [];
-  const [restaurants, categories, menuItems, hours] = await Promise.all([
+  const [restaurants, categories, menuItems, hours, ratings] = await Promise.all([
     readRows<RestaurantRow[]>("restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate&approval_status=eq.approved&is_blocked=eq.false&order=name.asc", signal),
     readRows<CategoryRow[]>("categories?select=id,restaurant_id,name,sort_order&is_active=eq.true&order=sort_order.asc,name.asc", signal),
     readRows<MenuItemRow[]>("menu_items?select=id,restaurant_id,category_id,name,description,image_url,price,is_available,stock,prep_minutes&approval_status=eq.approved&order=created_at.desc", signal),
-    readRows<RestaurantHoursRow[]>("restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&order=weekday.asc", signal)
+    readRows<RestaurantHoursRow[]>("restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&order=weekday.asc", signal),
+    readRatings(signal)
   ]);
-  return mapCatalog(restaurants, categories, menuItems, hours);
+  return mapCatalog(restaurants, categories, menuItems, hours, ratings);
+}
+
+// Administrators also see blocked and unapproved restaurants so they can moderate them.
+export async function fetchAdminCatalog(accessToken: string, signal?: AbortSignal): Promise<Restaurant[]> {
+  if (!catalogApiEnvironment.isConfigured) return [];
+  const [restaurants, categories, menuItems, hours, ratings] = await Promise.all([
+    readRows<RestaurantRow[]>("restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate,approval_status,rejection_reason&order=name.asc", signal, accessToken),
+    readRows<CategoryRow[]>("categories?select=id,restaurant_id,name,sort_order&order=sort_order.asc,name.asc", signal, accessToken),
+    readRows<MenuItemRow[]>("menu_items?select=id,restaurant_id,category_id,name,description,image_url,price,is_available,stock,prep_minutes,approval_status,rejection_reason&order=created_at.desc", signal, accessToken),
+    readRows<RestaurantHoursRow[]>("restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&order=weekday.asc", signal, accessToken),
+    readRatings(signal)
+  ]);
+  return mapCatalog(restaurants, categories, menuItems, hours, ratings);
 }
 
 export async function fetchOwnedRestaurant(restaurantId: string, accessToken: string, signal?: AbortSignal): Promise<Restaurant | null> {
   if (!catalogApiEnvironment.isConfigured) return null;
   const encodedId = encodeURIComponent(restaurantId);
-  const [restaurants, categories, menuItems, hours] = await Promise.all([
-    readRows<RestaurantRow[]>(`restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate&id=eq.${encodedId}&limit=1`, signal, accessToken),
+  const [restaurants, categories, menuItems, hours, ratings] = await Promise.all([
+    readRows<RestaurantRow[]>(`restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate,approval_status,rejection_reason&id=eq.${encodedId}&limit=1`, signal, accessToken),
     readRows<CategoryRow[]>(`categories?select=id,restaurant_id,name,sort_order&restaurant_id=eq.${encodedId}&order=sort_order.asc,name.asc`, signal, accessToken),
-    readRows<MenuItemRow[]>(`menu_items?select=id,restaurant_id,category_id,name,description,image_url,price,is_available,stock,prep_minutes&restaurant_id=eq.${encodedId}&order=created_at.desc`, signal, accessToken),
-    readRows<RestaurantHoursRow[]>(`restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&restaurant_id=eq.${encodedId}&order=weekday.asc`, signal, accessToken)
+    readRows<MenuItemRow[]>(`menu_items?select=id,restaurant_id,category_id,name,description,image_url,price,is_available,stock,prep_minutes,approval_status,rejection_reason&restaurant_id=eq.${encodedId}&order=created_at.desc`, signal, accessToken),
+    readRows<RestaurantHoursRow[]>(`restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&restaurant_id=eq.${encodedId}&order=weekday.asc`, signal, accessToken),
+    readRatings(signal)
   ]);
-  return mapCatalog(restaurants, categories, menuItems, hours)[0] ?? null;
+  return mapCatalog(restaurants, categories, menuItems, hours, ratings)[0] ?? null;
 }
 
 type OrderItemRow = { id: string; menu_item_id: string | null; name_snapshot: string; price_snapshot: number; quantity: number; note: string | null };
 type OrderRow = {
-  id: string; order_number: number; restaurant_id: string; status: string; payment_method: string;
+  id: string; order_number: number; customer_id: string; restaurant_id: string; status: string; payment_method: string;
   subtotal: number; delivery_fee: number; total: number; address_snapshot: { address?: string } | null;
   customer_snapshot: { name?: string; phone?: string } | null; note: string | null; rejection_reason: string | null;
   accepted_at: string | null; delivered_at: string | null; created_at: string; order_items: OrderItemRow[];
+  restaurants: { name: string; phone: string } | null;
 };
 
 const orderStatus: Record<string, OrderStatus> = {
@@ -129,9 +165,15 @@ const orderStatus: Record<string, OrderStatus> = {
   rejected: "Rad etildi", cancelled: "Bekor qilindi"
 };
 
-export async function fetchOwnedOrders(restaurantId: string, restaurantName: string, accessToken: string, signal?: AbortSignal): Promise<Order[]> {
-  const encodedId = encodeURIComponent(restaurantId);
-  const rows = await readRows<OrderRow[]>(`orders?restaurant_id=eq.${encodedId}&select=*,order_items(*)&order=created_at.desc&limit=100`, signal, accessToken);
+type OrderScope = { restaurantId: string } | { customerId: string } | "all";
+
+// Row level security decides which orders are visible; the scope only narrows
+// the query to what the current screen needs.
+export async function fetchOrders(scope: OrderScope, accessToken: string, signal?: AbortSignal): Promise<Order[]> {
+  const filter = scope === "all" ? "" : "restaurantId" in scope
+    ? `restaurant_id=eq.${encodeURIComponent(scope.restaurantId)}&`
+    : `customer_id=eq.${encodeURIComponent(scope.customerId)}&`;
+  const rows = await readRows<OrderRow[]>(`orders?${filter}select=*,order_items(*),restaurants(name,phone)&order=created_at.desc&limit=100`, signal, accessToken);
   return rows.map((row) => {
     const items: CartItem[] = (row.order_items ?? []).map((item) => ({
       id: item.menu_item_id ?? item.id,
@@ -149,8 +191,10 @@ export async function fetchOwnedOrders(restaurantId: string, restaurantName: str
     return {
       id: `XT-${row.order_number}`,
       serverId: row.id,
+      customerId: row.customer_id,
       restaurantId: row.restaurant_id,
-      restaurantName,
+      restaurantName: row.restaurants?.name ?? "Restoran",
+      courierPhone: row.restaurants?.phone || undefined,
       customerName: row.customer_snapshot?.name ?? "Mijoz",
       phone: row.customer_snapshot?.phone ?? "",
       address: row.address_snapshot?.address ?? "Manzil ko‘rsatilmagan",

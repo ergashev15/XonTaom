@@ -2,12 +2,16 @@ import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { Image } from "expo-image";
 import { Linking, ScrollView, View } from "react-native";
 import { useAuth } from "@/auth/auth-context";
+import { MenuItemForm } from "@/components/menu-item-form";
+import { RestaurantManagement } from "@/components/restaurant-management";
 import { AppText, Button, Card, Chip, EmptyState, Field, Row, Screen, StatusPill, useResponsiveLayout } from "@/components/ui";
 import { useAppStore } from "@/store/app-store";
 import { colors, money, radius, spacing } from "@/theme";
-import type { Order, OrderStatus } from "@/types";
+import type { MenuItem, Order, OrderStatus } from "@/types";
+import { confirmAction } from "@/utils/dialogs";
 import { cartUnitPrice } from "@/utils/order-rules";
 
 const stages: { title: string; statuses: OrderStatus[] }[] = [
@@ -16,6 +20,10 @@ const stages: { title: string; statuses: OrderStatus[] }[] = [
   { title: "Tayyorlanmoqda", statuses: ["Tayyorlanmoqda"] },
   { title: "Yetkazishda", statuses: ["Yetkazishga chiqdi"] }
 ];
+
+type PanelTab = "orders" | "menu" | "settings";
+const panelTabs: { key: PanelTab; label: string }[] = [{ key: "orders", label: "Buyurtmalar" }, { key: "menu", label: "Menyu" }, { key: "settings", label: "Boshqaruv" }];
+const approvalLabel = { pending: "Tekshiruvda", approved: "Tasdiqlangan", rejected: "Rad etilgan" } as const;
 
 const nextStatus: Partial<Record<OrderStatus, OrderStatus>> = {
   "Qabul qilindi": "Tayyorlanmoqda",
@@ -29,7 +37,10 @@ function countdown(deadline: string, now: number) {
 }
 
 export default function RestaurantPanelScreen() {
-  const { restaurants, orders, catalogStatus, refreshCatalog, updateOrder, setPrepMinutes } = useAppStore();
+  const { restaurants, orders, catalogStatus, refreshCatalog, updateOrder, setPrepMinutes, toggleRestaurant, toggleMenuItem, addMenuItem, updateMenuItem, deleteMenuItem } = useAppStore();
+  const [tab, setTab] = useState<PanelTab>("orders");
+  // undefined: list is shown; "new": empty form; otherwise the dish being edited.
+  const [editing, setEditing] = useState<MenuItem | "new">();
   const { session, signOut } = useAuth();
   const { restaurantId } = useLocalSearchParams<{ restaurantId?: string }>();
   const assignedRestaurantId = restaurantId ?? session?.user.app_metadata?.restaurant_id;
@@ -55,7 +66,10 @@ export default function RestaurantPanelScreen() {
     previousWaiting.current = waiting.length;
   }, [waiting.length, player]);
 
-  const OrderCard = ({ order }: { order: Order }) => {
+  // A plain render function, not a component: a component declared here would be
+  // a new type on every render and remount each second with the countdown,
+  // dropping focus from the rejection reason field.
+  const renderOrderCard = (order: Order) => {
     const isWaiting = ["Yangi buyurtma", "Restoran tasdig‘i kutilmoqda"].includes(order.status);
     const late = isWaiting && new Date(order.confirmationDeadline).getTime() < now;
     const reason = reasonByOrder[order.id] ?? "";
@@ -81,11 +95,29 @@ export default function RestaurantPanelScreen() {
 
   if (ownerRestaurantLoading) return <Screen maxWidth={720} style={{ justifyContent: "center", minHeight: "100%" }}><EmptyState icon="storefront-outline" title={catalogStatus.error ? "Restoran yuklanmadi" : "Restoran yuklanmoqda"} text={catalogStatus.error ?? "Saytda qo‘shilgan restoran ma’lumotlari serverdan olinmoqda."} action={<Button title="Qayta tekshirish" loading={catalogStatus.syncing} onPress={() => void refreshCatalog()} />} /></Screen>;
 
+  const categories = [...new Set([...(restaurant.categories ?? []), ...restaurant.menu.map((item) => item.category)])];
+  const removeDish = (item: MenuItem) => confirmAction({ title: "Taom o‘chirilsinmi?", message: item.name, confirmLabel: "O‘chirish", destructive: true, onConfirm: () => deleteMenuItem(restaurant.id, item.id) });
+  const menuTab = editing
+    ? <MenuItemForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} categories={categories} onCancel={() => setEditing(undefined)} onSubmit={(item) => { if (editing === "new") addMenuItem(restaurant.id, item); else updateMenuItem(restaurant.id, editing.id, item); setEditing(undefined); }} />
+    : <View style={{ gap: spacing.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}><AppText variant="heading">Menyu · {restaurant.menu.length} ta taom</AppText><Button title="Yangi taom" icon="add-outline" onPress={() => setEditing("new")} /></View>
+      {restaurant.menu.length ? restaurant.menu.map((item) => <Card key={item.id}>
+        <View style={{ flexDirection: "row", gap: spacing.md, alignItems: "center" }}>{item.image ? <Image source={{ uri: item.image }} contentFit="cover" style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.line }} /> : null}<View style={{ flex: 1, gap: 2 }}><AppText style={{ fontWeight: "800" }}>{item.name}</AppText><AppText variant="caption" color={colors.muted}>{item.category} · {money(item.price)}{item.stock !== undefined ? ` · qoldiq ${item.stock}` : ""}</AppText>{item.approvalStatus && item.approvalStatus !== "approved" ? <AppText variant="caption" color={item.approvalStatus === "rejected" ? colors.red : colors.orange} style={{ fontWeight: "800" }}>{approvalLabel[item.approvalStatus]}{item.rejectionReason ? `: ${item.rejectionReason}` : " — mijozlarga ko‘rinmaydi"}</AppText> : null}</View></View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}><Button title={item.available ? "Sotuvda" : "To‘xtatilgan"} size="sm" variant={item.available ? "primary" : "secondary"} onPress={() => toggleMenuItem(restaurant.id, item.id)} /><Button title="Tahrirlash" size="sm" variant="ghost" icon="create-outline" onPress={() => setEditing(item)} /><Button title="O‘chirish" size="sm" variant="danger" onPress={() => removeDish(item)} /></View>
+      </Card>) : <EmptyState icon="restaurant-outline" title="Menyu bo‘sh" text="Birinchi taomni qo‘shing. Administrator tasdiqlagach, u mijozlarga ko‘rinadi." />}
+    </View>;
+
   return <Screen maxWidth={1280}>
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, flexWrap: "wrap" }}>
-      <View style={{ gap: spacing.xs }}><AppText variant="title">Buyurtmalar</AppText><AppText color={colors.muted}>{restaurant.name} · faqat buyurtmalarni qabul qilish va bajarish paneli</AppText></View>
+      <View style={{ gap: spacing.xs }}><AppText variant="title">{restaurant.name}</AppText><AppText color={colors.muted}>Buyurtmalar, menyu va restoran sozlamalari</AppText></View>
       <View style={{ flexDirection: "row", gap: spacing.sm }}><Button title="Yangilash" icon="refresh-outline" variant="secondary" loading={catalogStatus.syncing} onPress={() => void refreshCatalog()} /><Button title="Chiqish" icon="log-out-outline" variant="ghost" onPress={() => { void signOut().then(() => router.replace("/")); }} /></View>
     </View>
+    {restaurant.approvalStatus && restaurant.approvalStatus !== "approved" ? <View accessibilityLiveRegion="polite" style={{ padding: spacing.md, backgroundColor: restaurant.approvalStatus === "rejected" ? colors.redSoft : colors.yellowSoft, borderRadius: radius.md }}><AppText color={restaurant.approvalStatus === "rejected" ? colors.red : colors.ink} style={{ fontWeight: "800" }}>{restaurant.approvalStatus === "rejected" ? `Restoran rad etildi${restaurant.rejectionReason ? `: ${restaurant.rejectionReason}` : "."}` : "Restoran administrator tekshiruvida. Tasdiqlanmaguncha mijozlarga ko‘rinmaydi va buyurtma qabul qilmaydi."}</AppText></View> : null}
+    {catalogStatus.error ? <View accessibilityLiveRegion="polite" style={{ padding: spacing.md, backgroundColor: colors.redSoft, borderRadius: radius.md }}><AppText selectable color={colors.red}>{catalogStatus.error}</AppText></View> : null}
+    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm }}>{panelTabs.map((item) => <Chip key={item.key} label={item.key === "orders" && waiting.length ? `${item.label} · ${waiting.length}` : item.label} active={tab === item.key} onPress={() => { setTab(item.key); setEditing(undefined); }} />)}<View style={{ flex: 1 }} /><StatusPill open={restaurant.isOpen} /><Button title={restaurant.isOpen ? "Yopish" : "Ochish"} size="sm" variant={restaurant.isOpen ? "danger" : "primary"} onPress={() => toggleRestaurant(restaurant.id)} /></View>
+    {tab === "menu" ? menuTab : null}
+    {tab === "settings" ? <RestaurantManagement key={restaurant.id} restaurantId={restaurant.id} /> : null}
+    {tab === "orders" ? <>
     {waiting.length ? <View style={{ padding: spacing.md, backgroundColor: colors.orangeSoft, borderRadius: radius.md }}><AppText color={colors.orange} style={{ fontWeight: "800" }}>Yangi buyurtmalar: {waiting.length} ta · ovozli signal yoqilgan</AppText></View> : null}
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
       <StatusSummary label="Yangi" value={waiting.length} tone="orange" />
@@ -94,8 +126,9 @@ export default function RestaurantPanelScreen() {
     </View>
     {activeOrders.length ? <ScrollView horizontal showsHorizontalScrollIndicator={!isDesktop} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>{stages.map((stage) => {
       const stageOrders = ownOrders.filter((order) => stage.statuses.includes(order.status));
-      return <View key={stage.title} style={{ width: isDesktop ? 285 : 310, gap: spacing.md }}><View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}><AppText variant="heading">{stage.title}</AppText><AppText variant="caption" color={colors.muted}>{stageOrders.length} ta</AppText></View>{stageOrders.length ? stageOrders.map((order) => <OrderCard key={order.id} order={order} />) : <Card><AppText color={colors.muted}>Bu bosqichda buyurtma yo‘q.</AppText></Card>}</View>;
+      return <View key={stage.title} style={{ width: isDesktop ? 285 : 310, gap: spacing.md }}><View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}><AppText variant="heading">{stage.title}</AppText><AppText variant="caption" color={colors.muted}>{stageOrders.length} ta</AppText></View>{stageOrders.length ? stageOrders.map((order) => <View key={order.id}>{renderOrderCard(order)}</View>) : <Card><AppText color={colors.muted}>Bu bosqichda buyurtma yo‘q.</AppText></Card>}</View>;
     })}</ScrollView> : <EmptyState icon="receipt-outline" title="Faol buyurtma yo‘q" text="Yangi buyurtma tushganda ovozli signal beriladi va shu ekranda ko‘rinadi." action={<Button title="Yangilash" loading={catalogStatus.syncing} onPress={() => void refreshCatalog()} />} />}
+    </> : null}
   </Screen>;
 }
 

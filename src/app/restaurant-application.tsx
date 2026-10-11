@@ -4,10 +4,14 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import { AppText, Button, Card, Chip, Field, PressableScale, Screen, StatusPill } from "@/components/ui";
+import { catalogApiEnvironment } from "@/api/catalog-api";
+import { useAuth } from "@/auth/auth-context";
+import { roleOf } from "@/auth/auth-service";
 import { useAppStore } from "@/store/app-store";
 import { colors, money, radius, spacing } from "@/theme";
+import { notify } from "@/utils/dialogs";
 
 type PhotoField = "logo" | "image" | "document";
 const cuisines = ["Milliy taomlar", "Osh markazi", "Kafe", "Fast food", "Kabob", "Qandolat"];
@@ -28,14 +32,20 @@ export default function RestaurantApplicationScreen() {
   const [error, setError] = useState("");
   const [submittedId, setSubmittedId] = useState<string>();
   const [picking, setPicking] = useState<PhotoField>();
-  const submitted = restaurantApplications.find((entry) => entry.id === submittedId);
+  const [sending, setSending] = useState(false);
+  const [reapplying, setReapplying] = useState(false);
+  const { session } = useAuth();
+  // With a backend the store holds this account's own applications, so the
+  // latest one is shown again whenever the applicant comes back to check it.
+  const ownLatest = catalogApiEnvironment.isConfigured && session && roleOf(session) !== "admin" && !reapplying ? restaurantApplications[0] : undefined;
+  const submitted = restaurantApplications.find((entry) => entry.id === submittedId) ?? ownLatest;
 
   const pickPhoto = async (field: PhotoField) => {
     setPicking(field);
     setError("");
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) { Alert.alert("Ruxsat kerak", "Rasm va hujjat nusxasini tanlash uchun galereyaga kirish ruxsatini bering."); return; }
+      if (!permission.granted) { notify("Ruxsat kerak", "Rasm va hujjat nusxasini tanlash uchun galereyaga kirish ruxsatini bering."); return; }
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: field !== "document", aspect: field === "logo" ? [1, 1] : [4, 3], quality: 0.82 });
       if (result.canceled || !result.assets[0]) return;
       let uri = result.assets[0].uri;
@@ -55,7 +65,8 @@ export default function RestaurantApplicationScreen() {
     }
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (sending) return;
     const delivery = Number(deliveryFee);
     const minimum = Number(minOrder);
     if (ownerName.trim().length < 3) { setError("Restoran egasining ism-familiyasini kiriting."); return; }
@@ -64,8 +75,17 @@ export default function RestaurantApplicationScreen() {
     if (address.trim().length < 8) { setError("Restoran manzilini to‘liq kiriting."); return; }
     if (!logo || !image || !documentImage) { setError("Logotip, restoran rasmi va tasdiqlovchi hujjat rasmini yuklang."); return; }
     if (!delivery || delivery < 0 || !minimum || minimum < 1000) { setError("Yetkazish narxi va minimal buyurtmani to‘g‘ri kiriting."); return; }
-    const application = submitRestaurantApplication({ ownerName: ownerName.trim(), restaurantName: restaurantName.trim(), phone: phone.trim(), address: address.trim(), hours: hours.trim(), cuisine, logo, image, documentImage, deliveryFee: delivery, minOrder: minimum });
-    setSubmittedId(application.id);
+    setError("");
+    setSending(true);
+    try {
+      const application = await submitRestaurantApplication({ ownerName: ownerName.trim(), restaurantName: restaurantName.trim(), phone: phone.trim(), address: address.trim(), hours: hours.trim(), cuisine, logo, image, documentImage, deliveryFee: delivery, minOrder: minimum });
+      setReapplying(false);
+      setSubmittedId(application.id);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Ariza yuborilmadi. Qayta urinib ko‘ring.");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (submitted) return <Screen maxWidth={700} style={{ justifyContent: "center", minHeight: "100%" }}>
@@ -73,6 +93,7 @@ export default function RestaurantApplicationScreen() {
       <View style={{ width: 86, height: 86, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: submitted.status === "Tasdiqlandi" ? colors.greenSoft : submitted.status === "Rad etildi" ? colors.redSoft : colors.orangeSoft }}><Ionicons name={submitted.status === "Tasdiqlandi" ? "checkmark-circle" : submitted.status === "Rad etildi" ? "close-circle" : "time"} size={44} color={submitted.status === "Tasdiqlandi" ? colors.green : submitted.status === "Rad etildi" ? colors.red : colors.orange} /></View>
       <View style={{ alignItems: "center", gap: spacing.sm }}><StatusPill open={submitted.status === "Tasdiqlandi"} label={submitted.status} /><AppText variant="title" style={{ textAlign: "center" }}>{submitted.restaurantName}</AppText><AppText color={colors.muted} style={{ textAlign: "center" }}>{submitted.status === "Kutilmoqda" ? "Arizangiz administratorga yuborildi. Tekshiruvdan keyin restoran paneli ochiladi." : submitted.status === "Tasdiqlandi" ? "Restoran tasdiqlandi. Endi menyu va xodimlarni boshqarishingiz mumkin." : `Rad etish sababi: ${submitted.rejectionReason}`}</AppText></View>
       {submitted.status === "Tasdiqlandi" && submitted.restaurantId ? <Button title="Restoran panelini ochish" icon="storefront-outline" size="lg" onPress={() => router.replace({ pathname: "/restaurant-panel", params: { restaurantId: submitted.restaurantId } })} style={{ width: "100%" }} /> : null}
+      {submitted.status === "Rad etildi" ? <Button title="Qayta ariza yuborish" icon="refresh-outline" onPress={() => { setSubmittedId(undefined); setReapplying(true); }} style={{ width: "100%" }} /> : null}
       <Button title="Bosh sahifaga qaytish" variant="ghost" onPress={() => router.replace("/")} style={{ width: "100%" }} />
     </Card>
   </Screen>;
@@ -86,6 +107,6 @@ export default function RestaurantApplicationScreen() {
     <Card><AppText variant="heading">3. Rasmlar va hujjat</AppText><AppText variant="caption" color={colors.muted}>Hujjat sifatida pasport yoki tadbirkorlik guvohnomasining aniq rasmini yuklang.</AppText><View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}><PhotoPicker field="logo" title="Logotip" value={logo} icon="image-outline" /><PhotoPicker field="image" title="Restoran rasmi" value={image} icon="storefront-outline" /><PhotoPicker field="document" title="Pasport yoki guvohnoma" value={documentImage} icon="document-text-outline" /></View></Card>
     <Card><AppText variant="heading">4. Buyurtma shartlari</AppText><Field label="YETKAZISH NARXI (SO‘M)" value={deliveryFee} onChangeText={(value) => setDeliveryFee(value.replace(/\D/g, ""))} keyboardType="number-pad" placeholder="8000" /><Field label="MINIMAL BUYURTMA (SO‘M)" value={minOrder} onChangeText={(value) => setMinOrder(value.replace(/\D/g, ""))} keyboardType="number-pad" placeholder="30000" /><View style={{ padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.greenSoft }}><AppText variant="caption" color={colors.green}>Mijozlar uchun: yetkazish {money(Number(deliveryFee) || 0)}, minimal buyurtma {money(Number(minOrder) || 0)}</AppText></View></Card>
     {error ? <View accessibilityLiveRegion="polite" style={{ padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.redSoft }}><AppText selectable color={colors.red}>{error}</AppText></View> : null}
-    <Button title="Arizani administratorga yuborish" icon="paper-plane-outline" size="lg" onPress={submit} />
+    <Button title="Arizani administratorga yuborish" icon="paper-plane-outline" size="lg" loading={sending} disabled={sending} onPress={() => void submit()} />
   </Screen>;
 }

@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Linking, ScrollView, View } from "react-native";
+import { Linking, ScrollView, View } from "react-native";
 import { AppText, CustomerShell, EmptyState, PressableScale, Screen, useResponsiveLayout } from "@/components/ui";
+import { useAuth } from "@/auth/auth-context";
 import { useAppStore } from "@/store/app-store";
 import { colors, money, radius, shadow, spacing } from "@/theme";
 import { Order, OrderStatus } from "@/types";
+import { confirmAction, notify } from "@/utils/dialogs";
 
 type Filter = "all" | "active" | "delivered" | "cancelled";
 
@@ -18,7 +20,11 @@ const filterItems: { key: Filter; label: string }[] = [
 
 export default function OrdersScreen() {
   const { created } = useLocalSearchParams<{ created?: string }>();
-  const { orders, reorder, cart } = useAppStore();
+  const { myOrders: orders, reviews, reorder, cancelOrder, submitReview, cart } = useAppStore();
+  const { session } = useAuth();
+  // Reviews reference the server order id when there is one, otherwise the local id.
+  const ratingByOrder = useMemo(() => new Map(reviews.filter((review) => review.orderId && (!review.customerId || review.customerId === session?.user.id)).map((review) => [review.orderId!, review.rating])), [reviews, session?.user.id]);
+  const rate = (order: Order, rating: number) => confirmAction({ title: `${rating} yulduz bilan baholaysizmi?`, message: `${order.restaurantName} · #${order.id.replace("XT-", "")}. Bahoni keyin o‘zgartirib bo‘lmaydi.`, confirmLabel: "Baholash", onConfirm: () => { submitReview(order.id, rating, "").catch((error) => notify("Baholab bo‘lmadi", error instanceof Error ? error.message : "Qayta urinib ko‘ring.")); } });
   const { isDesktop } = useResponsiveLayout();
   const [filter, setFilter] = useState<Filter>("all");
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -33,7 +39,7 @@ export default function OrdersScreen() {
     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}><AppText variant="title">Buyurtmalar</AppText><View style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: colors.surface }}><Ionicons name="settings-outline" size={21} color={colors.ink} /></View></View>
     {created ? <View style={{ padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.greenSoft }}><AppText variant="caption" color={colors.green} style={{ fontWeight: "800" }}>Buyurtma yuborildi: {created}</AppText></View> : null}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.md }}>{filterItems.map((item) => <FilterChip key={item.key} label={item.label} active={filter === item.key} onPress={() => setFilter(item.key)} />)}</ScrollView>
-    <View style={{ gap: spacing.md }}>{visible.map((order) => <OrderCard key={order.id} order={order} onReorder={() => { if (reorder(order.id)) router.push("/cart"); else Alert.alert("Qayta buyurtma berib bo‘lmadi", "Restoran yopiq yoki taomlar hozir mavjud emas."); }} />)}{!visible.length ? <EmptyState icon="receipt-outline" title="Buyurtma topilmadi" text="Tanlangan holat bo‘yicha buyurtmalar yo‘q." /> : null}</View>
+    <View style={{ gap: spacing.md }}>{visible.map((order) => <OrderCard key={order.id} order={order} rating={ratingByOrder.get(order.serverId ?? order.id)} onRate={(rating) => rate(order, rating)} onCancel={() => confirmAction({ title: "Buyurtmani bekor qilasizmi?", message: `#${order.id.replace("XT-", "")} · ${order.restaurantName}`, confirmLabel: "Bekor qilish", destructive: true, onConfirm: () => { cancelOrder(order.id).catch((error) => notify("Bekor qilib bo‘lmadi", error instanceof Error ? error.message : "Qayta urinib ko‘ring.")); } })} onReorder={() => { if (reorder(order.id)) router.push("/cart"); else notify("Qayta buyurtma berib bo‘lmadi", "Restoran yopiq yoki taomlar hozir mavjud emas."); }} />)}{!visible.length ? <EmptyState icon="receipt-outline" title="Buyurtma topilmadi" text="Tanlangan holat bo‘yicha buyurtmalar yo‘q." /> : null}</View>
   </Screen></CustomerShell>;
 }
 
@@ -41,7 +47,8 @@ function FilterChip({ label, active, onPress }: { label: string; active: boolean
   return <PressableScale accessibilityLabel={label} accessibilityState={{ selected: active }} onPress={onPress} style={{ minHeight: 38, justifyContent: "center", paddingHorizontal: 14, borderRadius: radius.full, backgroundColor: active ? colors.green : colors.surfaceMuted }}><AppText variant="caption" color={active ? colors.white : colors.muted} style={{ fontWeight: "800" }}>{label}</AppText></PressableScale>;
 }
 
-function OrderCard({ order, onReorder }: { order: Order; onReorder: () => void }) {
+function OrderCard({ order, rating, onRate, onReorder, onCancel }: { order: Order; rating?: number; onRate: (rating: number) => void; onReorder: () => void; onCancel: () => void }) {
+  const cancellable = order.status === "Yangi buyurtma" || order.status === "Restoran tasdig‘i kutilmoqda";
   const cancelled = order.status === "Rad etildi" || order.status === "Bekor qilindi";
   const delivered = order.status === "Yetkazildi";
   const tone = cancelled ? colors.red : delivered ? colors.green : colors.orange;
@@ -52,5 +59,8 @@ function OrderCard({ order, onReorder }: { order: Order; onReorder: () => void }
     <View style={{ gap: 5 }}>{order.items.map((item) => <View key={item.lineId} style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}><AppText variant="caption" color={colors.muted}>{item.name} ×{item.quantity}</AppText><AppText variant="caption" style={{ fontWeight: "700" }}>{money(item.price * item.quantity)}</AppText></View>)}</View>
     <View style={{ height: 1, backgroundColor: colors.line }} /><View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}><AppText variant="caption" color={colors.muted}>Jami</AppText><AppText style={{ fontWeight: "900" }}>{money(order.total)}</AppText></View>
     <View style={{ flexDirection: "row", gap: spacing.sm }}><PressableScale accessibilityLabel="Restoranga qo‘ng‘iroq qilish" onPress={() => order.courierPhone && Linking.openURL(`tel:${order.courierPhone}`)} style={{ flex: 1, minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, borderRadius: radius.sm, backgroundColor: colors.surfaceMuted }}><Ionicons name="call-outline" size={16} color={colors.green} /><AppText variant="caption" color={colors.green}>Bog‘lanish</AppText></PressableScale><PressableScale accessibilityLabel="Qayta buyurtma berish" onPress={onReorder} style={{ flex: 1, minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, borderRadius: radius.sm, backgroundColor: colors.greenSoft }}><Ionicons name="refresh-outline" size={16} color={colors.green} /><AppText variant="caption" color={colors.green}>Qayta buyurtma</AppText></PressableScale></View>
+    {cancellable ? <PressableScale accessibilityLabel="Buyurtmani bekor qilish" onPress={onCancel} style={{ minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, borderRadius: radius.sm, backgroundColor: colors.redSoft }}><Ionicons name="close-circle-outline" size={16} color={colors.red} /><AppText variant="caption" color={colors.red}>Buyurtmani bekor qilish</AppText></PressableScale> : null}
+    {cancelled && order.rejectionReason ? <AppText variant="caption" color={colors.red}>Sabab: {order.rejectionReason}</AppText> : null}
+    {delivered ? <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}><AppText variant="caption" color={colors.muted}>{rating ? "Sizning bahoyingiz" : "Buyurtmani baholang"}</AppText><View style={{ flexDirection: "row", gap: 2 }}>{[1, 2, 3, 4, 5].map((star) => <PressableScale key={star} accessibilityLabel={`${star} yulduz`} disabled={Boolean(rating)} hitSlop={6} onPress={() => onRate(star)} style={{ padding: 4 }}><Ionicons name={rating && star <= rating ? "star" : "star-outline"} size={24} color={colors.yellow} /></PressableScale>)}</View></View> : null}
   </View>;
 }

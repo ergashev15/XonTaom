@@ -40,7 +40,9 @@ function AppNavigator() {
   return (
     <><StatusBar style={isDark ? "light" : "dark"} /><Stack screenOptions={{ animation: reducedMotion ? "fade" : "default", headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.green, headerTitleStyle: { color: colors.ink, fontWeight: "800" }, headerBackButtonDisplayMode: "minimal", contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="register" options={{ title: "Ro‘yxatdan o‘tish" }} />
+        <Stack.Screen name="register" options={{ headerShown: false }} />
+        <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="restaurant-application" options={{ title: "Restoran qo‘shish" }} />
         <Stack.Screen name="home" options={{ title: "XonTaom", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />

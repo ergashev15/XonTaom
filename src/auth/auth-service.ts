@@ -238,6 +238,42 @@ export async function signInWithEmail(email: string, password: string) {
   return session;
 }
 
+function passwordRecoveryRedirectUri() {
+  return Platform.OS === "web"
+    ? AuthSessionBrowser.makeRedirectUri({ path: "reset-password" })
+    : AuthSessionBrowser.makeRedirectUri({ scheme: "xontaom", path: "reset-password", native: "xontaom://reset-password" });
+}
+
+export async function requestPasswordReset(email: string) {
+  assertConfigured();
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(passwordRecoveryRedirectUri())}`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ email: normalizeEmailAddress(email) })
+    });
+    await parseResponse<Record<string, never>>(response);
+  } catch (error) {
+    if (error instanceof AuthError) throw error;
+    throw new AuthError("Internet bilan aloqa yo‘q. Ulanishni tekshirib, qayta urinib ko‘ring.", "NETWORK_ERROR");
+  }
+}
+
+export async function updatePasswordWithRecoveryToken(accessToken: string, password: string) {
+  assertConfigured();
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: "PUT",
+      headers: headers(accessToken),
+      body: JSON.stringify({ password })
+    });
+    await parseResponse<AuthUser>(response);
+  } catch (error) {
+    if (error instanceof AuthError) throw error;
+    throw new AuthError("Internet bilan aloqa yo‘q. Ulanishni tekshirib, qayta urinib ko‘ring.", "NETWORK_ERROR");
+  }
+}
+
 function oauthCallbackParams(callbackUrl: string) {
   const parsed = new URL(callbackUrl);
   const params = new URLSearchParams(parsed.search);
@@ -392,7 +428,7 @@ export async function completeCustomerRegistration(session: AuthSession, input: 
   const verifiedEmail = normalizeEmailAddress(session.user.email ?? "");
   const requestedEmail = normalizeEmailAddress(input.email);
   if (!verifiedEmail || verifiedEmail !== requestedEmail) {
-    throw new AuthError("Tanlangan Google akkaunti kiritilgan Gmail manziliga mos kelmadi.", "GOOGLE_EMAIL_MISMATCH");
+    throw new AuthError("Tasdiqlangan akkaunt emaili kiritilgan manzilga mos kelmadi.", "GOOGLE_EMAIL_MISMATCH");
   }
 
   const phone = normalizeUzPhone(input.phone);

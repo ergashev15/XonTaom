@@ -12,7 +12,10 @@ Mobil ilova va restoran portali bir xil Supabase loyihasidan foydalanadi. Google
 5. Supabase Dashboard → Authentication → URL Configuration → Redirect URLs ro‘yxatiga quyidagilarni qo‘shing:
 
    - `xontaom://auth/callback`
+   - `xontaom://reset-password`
    - restoran portalining aniq HTTPS manzili
+
+`xontaom://reset-password` email/parol akkauntlari uchun “Parolni unutdingizmi?” havolasini ilovaga xavfsiz qaytaradi. Web nashr ishlatilsa, uning aniq HTTPS manzilidagi `/reset-password` route ham Redirect URLs ro‘yxatiga qo‘shiladi.
 
 Google Client Secret mobil ilova, sayt kodi yoki `.env` fayliga yozilmaydi; u faqat Supabase Dashboard’da saqlanadi.
 

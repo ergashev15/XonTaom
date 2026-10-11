@@ -2,7 +2,7 @@
 
 ## Restoran boshqaruv sayti
 
-Restoran egalari uchun alohida web-kabinet `restaurant-portal/` papkasida joylashgan. U restoran profili, menyu bo‘limlari, taomlar, mavjudlik va buyurtmalarni boshqaradi.
+Restoran egalari uchun alohida web-kabinet `restaurant-portal/` papkasida joylashgan. Saytda restoran profili, menyu bo‘limlari, taomlar va ularning mavjudligi boshqariladi. Buyurtmalar esa faqat mobil ilovadagi restoran panelida qabul qilinadi va bajariladi.
 
 Umumiy ma’lumot oqimi:
 

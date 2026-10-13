@@ -11,6 +11,8 @@ type OrderInput = {
   name: string;
   phone: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
   note: string;
   items: CartItem[];
   // Stays the same across retries of one checkout so the server creates a single order.
@@ -27,7 +29,7 @@ export async function createServerOrder(input: OrderInput) {
     body: JSON.stringify({
       p_restaurant_id: input.restaurantId,
       p_payment_method: input.payment === "Naqd" ? "cash" : "card_on_delivery",
-      p_address_snapshot: { address: input.address },
+      p_address_snapshot: { address: input.address, latitude: input.latitude, longitude: input.longitude },
       p_customer_snapshot: { name: input.name, phone: input.phone },
       p_note: input.note,
       p_items: input.items.map((item) => ({ menu_item_id: item.id, quantity: item.quantity, note: item.note ?? "" })),

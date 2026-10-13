@@ -72,6 +72,13 @@ export function updateOwnedRestaurantOpen(restaurantId: string, isOpen: boolean,
   return request(`restaurants?id=eq.${encodeURIComponent(restaurantId)}`, accessToken, { method: "PATCH", body: JSON.stringify({ is_open: isOpen }) });
 }
 
+export function updateOwnedDeliveryZone(restaurantId: string, latitude: number, longitude: number, radiusKm: number, accessToken: string) {
+  return request("rpc/update_restaurant_delivery_zone", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ p_restaurant_id: restaurantId, p_latitude: latitude, p_longitude: longitude, p_radius_km: radiusKm })
+  });
+}
+
 export function updateOwnedMenuAvailability(itemId: string, available: boolean, accessToken: string) {
   return request(`menu_items?id=eq.${encodeURIComponent(itemId)}`, accessToken, { method: "PATCH", body: JSON.stringify({ is_available: available }) });
 }

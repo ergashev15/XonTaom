@@ -124,9 +124,9 @@ export default function RestaurantPanelScreen() {
       <StatusSummary label="Jarayonda" value={Math.max(0, activeOrders.length - waiting.length)} tone="green" />
       <StatusSummary label="Bugun yakunlangan" value={ownOrders.filter((order) => order.status === "Yetkazildi" && new Date(order.deliveredAt ?? order.createdAt).toDateString() === new Date().toDateString()).length} tone="green" />
     </View>
-    {activeOrders.length ? <ScrollView horizontal showsHorizontalScrollIndicator={!isDesktop} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>{stages.map((stage) => {
+    {activeOrders.length ? <ScrollView horizontal={isDesktop} scrollEnabled={isDesktop} showsHorizontalScrollIndicator={isDesktop} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm, flexDirection: isDesktop ? "row" : "column", width: isDesktop ? undefined : "100%" }}>{stages.map((stage) => {
       const stageOrders = ownOrders.filter((order) => stage.statuses.includes(order.status));
-      return <View key={stage.title} style={{ width: isDesktop ? 285 : 310, gap: spacing.md }}><View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}><AppText variant="heading">{stage.title}</AppText><AppText variant="caption" color={colors.muted}>{stageOrders.length} ta</AppText></View>{stageOrders.length ? stageOrders.map((order) => <View key={order.id}>{renderOrderCard(order)}</View>) : <Card><AppText color={colors.muted}>Bu bosqichda buyurtma yo‘q.</AppText></Card>}</View>;
+      return <View key={stage.title} style={{ width: isDesktop ? 285 : "100%", gap: spacing.md }}><View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}><AppText variant="heading">{stage.title}</AppText><AppText variant="caption" color={colors.muted}>{stageOrders.length} ta</AppText></View>{stageOrders.length ? stageOrders.map((order) => <View key={order.id}>{renderOrderCard(order)}</View>) : <Card><AppText color={colors.muted}>Bu bosqichda buyurtma yo‘q.</AppText></Card>}</View>;
     })}</ScrollView> : <EmptyState icon="receipt-outline" title="Faol buyurtma yo‘q" text="Yangi buyurtma tushganda ovozli signal beriladi va shu ekranda ko‘rinadi." action={<Button title="Yangilash" loading={catalogStatus.syncing} onPress={() => void refreshCatalog()} />} />}
     </> : null}
   </Screen>;

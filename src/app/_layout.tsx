@@ -1,4 +1,5 @@
 import "@/utils/animation-polyfill";
+import { Sentry } from "@/monitoring/sentry";
 import { Stack } from "expo-router/stack";
 import { router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -65,6 +66,8 @@ function AppNavigator() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return <AppThemeProvider><AuthProvider><PushNotificationBridge /><AppStoreProvider><AppNavigator /></AppStoreProvider></AuthProvider></AppThemeProvider>;
 }
+
+export default Sentry.wrap(RootLayout);

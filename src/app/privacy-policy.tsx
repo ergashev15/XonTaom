@@ -4,11 +4,13 @@ const sections: LegalSection[] = [
   { title: "Qanday ma’lumotlar olinadi", paragraphs: [
     "XonTaom ro‘yxatdan o‘tish va xizmat ko‘rsatish uchun ism, email, telefon raqami va yetkazib berish manzilini qayta ishlaydi.",
     "Buyurtma tarkibi, to‘lov turi, restoran bilan bog‘liq ma’lumotlar va xizmat tarixini saqlaymiz. Restoran hamkorlari yuklagan taom rasmlari faqat foydalanuvchi tanlaganidan keyin olinadi.",
-    "Push bildirishnomalar uchun qurilma turi va Expo push token saqlanadi. Token reklama kuzatuvi uchun ishlatilmaydi."
+    "Push bildirishnomalar uchun qurilma turi va Expo push token saqlanadi. Token reklama kuzatuvi uchun ishlatilmaydi.",
+    "Yetkazish hududini tekshirish uchun foydalanuvchi tanlagan xarita koordinatasi buyurtma manzili bilan saqlanadi. Ilova fon rejimida joylashuvni kuzatmaydi.",
+    "Ilova ishdan chiqishi va texnik xatolarni aniqlash uchun Sentry qurilma turi, ilova versiyasi, xato tafsilotlari va texnik diagnostikani olishi mumkin. Reklama identifikatori va standart bo‘yicha shaxsni aniqlovchi ma’lumot yuborilmaydi."
   ]},
   { title: "Ma’lumotlardan foydalanish", paragraphs: [
     "Ma’lumotlar hisobni yuritish, buyurtmani restoranga yetkazish, holat haqida xabar berish, firibgarlikning oldini olish va xizmatni yaxshilash uchun ishlatiladi.",
-    "XonTaom shaxsiy ma’lumotlarni sotmaydi. Xizmat ishlashi uchun ma’lumotlar Supabase, Google autentifikatsiyasi, Expo va Firebase Cloud Messaging kabi texnik xizmatlarda qayta ishlanishi mumkin."
+    "XonTaom shaxsiy ma’lumotlarni sotmaydi. Xizmat ishlashi uchun ma’lumotlar Supabase, Google autentifikatsiyasi, Expo, Firebase Cloud Messaging, OpenStreetMap va Sentry kabi texnik xizmatlarda qayta ishlanishi mumkin."
   ]},
   { title: "Saqlash va himoya", paragraphs: [
     "Ma’lumotlar xizmat ko‘rsatish, nizolarni hal qilish va qonuniy majburiyatlar uchun zarur muddat davomida saqlanadi. Kirish tokenlari qurilmaning himoyalangan xotirasida saqlanadi.",

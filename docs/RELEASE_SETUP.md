@@ -15,8 +15,8 @@ Firebase service-account key, Expo access token, or Supabase service-role key.
    This file contains public client identifiers and may be committed.
 4. Generate an FCM V1 service-account key. Do not commit it. Upload it with
    `eas credentials` under Android production > Google Service Account > FCM V1.
-5. Run migrations `0009_push_notifications.sql` and
-   `0010_account_deletion.sql` against Supabase.
+5. Run migrations `0009_push_notifications.sql`, `0010_account_deletion.sql`
+   and `0011_delivery_zones.sql` against Supabase.
 6. Deploy `supabase/functions/send-push` with JWT verification disabled and set
    `PUSH_WEBHOOK_SECRET`. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are
    supplied by Supabase; `EXPO_ACCESS_TOKEN` is optional when Expo enhanced
@@ -66,3 +66,10 @@ anonymize personal data according to the retention policy.
   applying for production access.
 - iOS publication additionally requires Apple Developer Program membership,
   APNs credentials, App Store Connect metadata, and iOS device testing.
+
+## 5. Sentry error tracking
+
+Create a React Native project in Sentry and set `EXPO_PUBLIC_SENTRY_DSN` for
+production builds. For release source maps, add `SENTRY_AUTH_TOKEN`,
+`SENTRY_ORG`, and `SENTRY_PROJECT` as EAS secrets. The app intentionally does
+not send events in development and has default PII collection disabled.

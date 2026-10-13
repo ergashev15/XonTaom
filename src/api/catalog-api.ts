@@ -17,6 +17,9 @@ type RestaurantRow = {
   delivery_fee: number;
   eta_min: number;
   commission_rate: number;
+  latitude: number | null;
+  longitude: number | null;
+  delivery_radius_km: number | null;
   approval_status?: ApprovalStatus;
   rejection_reason?: string | null;
 };
@@ -106,6 +109,9 @@ function mapCatalog(restaurants: RestaurantRow[], categories: CategoryRow[], men
     deliveryFee: Number(row.delivery_fee),
     eta: `${row.eta_min}–${row.eta_min + 15} daqiqa`,
     commission: Number(row.commission_rate),
+    latitude: row.latitude ?? undefined,
+    longitude: row.longitude ?? undefined,
+    deliveryRadiusKm: row.delivery_radius_km == null ? undefined : Number(row.delivery_radius_km),
     categories: categories.filter((category) => category.restaurant_id === row.id).map((category) => category.name),
     menu: menuByRestaurant.get(row.id) ?? []
     });
@@ -115,7 +121,7 @@ function mapCatalog(restaurants: RestaurantRow[], categories: CategoryRow[], men
 export async function fetchCatalog(signal?: AbortSignal): Promise<Restaurant[]> {
   if (!catalogApiEnvironment.isConfigured) return [];
   const [restaurants, categories, menuItems, hours, ratings] = await Promise.all([
-    readRows<RestaurantRow[]>("restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate&approval_status=eq.approved&is_blocked=eq.false&order=name.asc", signal),
+    readRows<RestaurantRow[]>("restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate,latitude,longitude,delivery_radius_km&approval_status=eq.approved&is_blocked=eq.false&order=name.asc", signal),
     readRows<CategoryRow[]>("categories?select=id,restaurant_id,name,sort_order&is_active=eq.true&order=sort_order.asc,name.asc", signal),
     readRows<MenuItemRow[]>("menu_items?select=id,restaurant_id,category_id,name,description,image_url,price,is_available,stock,prep_minutes&approval_status=eq.approved&order=created_at.desc", signal),
     readRows<RestaurantHoursRow[]>("restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&order=weekday.asc", signal),
@@ -128,7 +134,7 @@ export async function fetchCatalog(signal?: AbortSignal): Promise<Restaurant[]> 
 export async function fetchAdminCatalog(accessToken: string, signal?: AbortSignal): Promise<Restaurant[]> {
   if (!catalogApiEnvironment.isConfigured) return [];
   const [restaurants, categories, menuItems, hours, ratings] = await Promise.all([
-    readRows<RestaurantRow[]>("restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate,approval_status,rejection_reason&order=name.asc", signal, accessToken),
+    readRows<RestaurantRow[]>("restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate,latitude,longitude,delivery_radius_km,approval_status,rejection_reason&order=name.asc", signal, accessToken),
     readRows<CategoryRow[]>("categories?select=id,restaurant_id,name,sort_order&order=sort_order.asc,name.asc", signal, accessToken),
     readRows<MenuItemRow[]>("menu_items?select=id,restaurant_id,category_id,name,description,image_url,price,is_available,stock,prep_minutes,approval_status,rejection_reason&order=created_at.desc", signal, accessToken),
     readRows<RestaurantHoursRow[]>("restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&order=weekday.asc", signal, accessToken),
@@ -141,7 +147,7 @@ export async function fetchOwnedRestaurant(restaurantId: string, accessToken: st
   if (!catalogApiEnvironment.isConfigured) return null;
   const encodedId = encodeURIComponent(restaurantId);
   const [restaurants, categories, menuItems, hours, ratings] = await Promise.all([
-    readRows<RestaurantRow[]>(`restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate,approval_status,rejection_reason&id=eq.${encodedId}&limit=1`, signal, accessToken),
+    readRows<RestaurantRow[]>(`restaurants?select=id,name,cuisine,phone,address,image_url,is_open,is_blocked,min_order,delivery_fee,eta_min,commission_rate,latitude,longitude,delivery_radius_km,approval_status,rejection_reason&id=eq.${encodedId}&limit=1`, signal, accessToken),
     readRows<CategoryRow[]>(`categories?select=id,restaurant_id,name,sort_order&restaurant_id=eq.${encodedId}&order=sort_order.asc,name.asc`, signal, accessToken),
     readRows<MenuItemRow[]>(`menu_items?select=id,restaurant_id,category_id,name,description,image_url,price,is_available,stock,prep_minutes,approval_status,rejection_reason&restaurant_id=eq.${encodedId}&order=created_at.desc`, signal, accessToken),
     readRows<RestaurantHoursRow[]>(`restaurant_hours?select=restaurant_id,weekday,opens_at,closes_at,is_closed&restaurant_id=eq.${encodedId}&order=weekday.asc`, signal, accessToken),

@@ -18,21 +18,21 @@ export function removeFavorite(restaurantId: string, userId: string, accessToken
   return rest(`favorites?profile_id=eq.${encodeURIComponent(userId)}&restaurant_id=eq.${encodeURIComponent(restaurantId)}`, accessToken, { method: "DELETE", prefer: "return=minimal" });
 }
 
-type AddressRow = { id: string; label: string | null; address: string; house: string | null; landmark: string | null };
+type AddressRow = { id: string; label: string | null; address: string; house: string | null; landmark: string | null; lat: number | null; lng: number | null };
 
-const mapAddress = (row: AddressRow): SavedAddress => ({ id: row.id, label: row.label || "Manzil", address: row.address, house: row.house ?? "", landmark: row.landmark ?? "" });
+const mapAddress = (row: AddressRow): SavedAddress => ({ id: row.id, label: row.label || "Manzil", address: row.address, house: row.house ?? "", landmark: row.landmark ?? "", latitude: row.lat ?? undefined, longitude: row.lng ?? undefined });
 
 export async function fetchAddresses(accessToken: string, signal?: AbortSignal) {
   // The address saved during registration ("Asosiy") is listed first.
-  const rows = await rest<AddressRow[]>("addresses?select=id,label,address,house,landmark&order=label.asc", accessToken, { signal });
+  const rows = await rest<AddressRow[]>("addresses?select=id,label,address,house,landmark,lat,lng&order=label.asc", accessToken, { signal });
   return rows.map(mapAddress).sort((a, b) => Number(b.label === "Asosiy") - Number(a.label === "Asosiy"));
 }
 
 export async function createAddress(input: Omit<SavedAddress, "id">, userId: string, accessToken: string) {
-  const rows = await rest<AddressRow[]>("addresses?select=id,label,address,house,landmark", accessToken, {
+  const rows = await rest<AddressRow[]>("addresses?select=id,label,address,house,landmark,lat,lng", accessToken, {
     method: "POST",
     prefer: "return=representation",
-    body: { profile_id: userId, label: input.label.trim(), address: input.address.trim(), house: input.house.trim(), landmark: input.landmark.trim() || null }
+    body: { profile_id: userId, label: input.label.trim(), address: input.address.trim(), house: input.house.trim(), landmark: input.landmark.trim() || null, lat: input.latitude, lng: input.longitude }
   });
   return mapAddress(rows[0]);
 }

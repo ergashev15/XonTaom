@@ -5,14 +5,15 @@ import { AppState } from "react-native";
 import { addFavorite, createReview, fetchFavorites, fetchReviews, removeFavorite } from "@/api/account-api";
 import { catalogApiEnvironment, fetchAdminCatalog, fetchCatalog, fetchOrders, fetchOwnedRestaurant } from "@/api/catalog-api";
 import { cancelServerOrder, createServerOrder } from "@/api/order-api";
-import { createOwnedCategory, createOwnedMenuItem, deleteOwnedCategory, deleteOwnedMenuItem, updateOwnedMenuAvailability, updateOwnedMenuItem, updateOwnedOrder, updateOwnedRestaurantHours, updateOwnedRestaurantOpen, updateRestaurantBlocked } from "@/api/owner-api";
+import { createOwnedCategory, createOwnedMenuItem, deleteOwnedCategory, deleteOwnedMenuItem, updateOwnedDeliveryZone, updateOwnedMenuAvailability, updateOwnedMenuItem, updateOwnedOrder, updateOwnedRestaurantHours, updateOwnedRestaurantOpen, updateRestaurantBlocked } from "@/api/owner-api";
+import { subscribeToOrderChanges } from "@/api/realtime";
 import { createApplication, createCampaign, createStaffMember, fetchApplications, fetchCampaigns, fetchStaff, moderateMenuItem, moderateRestaurant, replyToReview as replyToServerReview, reviewApplication, setCampaignActive, setReviewVisible, setStaffActive } from "@/api/partner-api";
 import { useAuth } from "@/auth/auth-context";
 import { campaignsSeed, ordersSeed, restaurantsSeed, reviewsSeed } from "@/data/seed";
 import { AppNotification, Campaign, CartItem, MenuExtra, MenuItem, MenuVariant, Order, OrderStatus, Restaurant, RestaurantApplication, Review, StaffMember } from "@/types";
 import { calculateTotals, canAddFromRestaurant } from "@/utils/order-rules";
 
-type CheckoutInput = { name: string; phone: string; address: string; note: string; payment: Order["payment"] };
+type CheckoutInput = { name: string; phone: string; address: string; latitude?: number; longitude?: number; note: string; payment: Order["payment"] };
 export type NewMenuItemInput = Omit<MenuItem, "id" | "available">;
 // With a configured backend the server is the only source of truth for orders;
 // the built-in demo data is used only when no backend is configured.
@@ -53,6 +54,7 @@ type Store = {
   updateMenuItem: (restaurantId: string, itemId: string, item: NewMenuItemInput) => void;
   deleteMenuItem: (restaurantId: string, itemId: string) => void;
   updateRestaurantHours: (restaurantId: string, hours: string) => void;
+  updateDeliveryZone: (restaurantId: string, latitude: number, longitude: number, radiusKm: number) => Promise<void>;
   addRestaurantCategory: (restaurantId: string, category: string) => void;
   deleteRestaurantCategory: (restaurantId: string, category: string) => void;
   addCampaign: (campaign: Omit<Campaign, "id" | "active">) => void;
@@ -164,6 +166,18 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     const subscription = AppState.addEventListener("change", (next) => { if (next === "active") void refreshCatalog(); });
     return () => { clearInterval(timer); subscription.remove(); };
   }, [refreshCatalog]);
+
+  // Realtime is the primary path for order changes. The 30-second interval
+  // above remains only as recovery if a phone temporarily loses its socket.
+  useEffect(() => {
+    if (!serverMode || !session?.access_token) return;
+    let active = true;
+    let cleanup: (() => void) | undefined;
+    subscribeToOrderChanges(session.access_token, () => { if (active) void refreshCatalog(); })
+      .then((unsubscribe) => { if (active) cleanup = unsubscribe; else unsubscribe(); })
+      .catch(() => undefined);
+    return () => { active = false; cleanup?.(); };
+  }, [session?.access_token, refreshCatalog]);
 
   useEffect(() => {
     if (process.env.EXPO_OS === "web") { setHydrated(true); return; }
@@ -278,6 +292,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       name: input.name,
       phone: input.phone,
       address: input.address,
+      latitude: input.latitude,
+      longitude: input.longitude,
       note: input.note,
       items: cart
     }) : null;
@@ -407,6 +423,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     updateRestaurantHours: (restaurantId, hours) => {
       setRestaurants((current) => current.map((restaurant) => restaurant.id === restaurantId ? { ...restaurant, hours } : restaurant));
       if (session?.access_token) syncOwnerChange(() => updateOwnedRestaurantHours(restaurantId, hours, session.access_token));
+    },
+    updateDeliveryZone: async (restaurantId, latitude, longitude, radiusKm) => {
+      if (!session?.access_token) throw new Error("Hisobga qayta kiring.");
+      await updateOwnedDeliveryZone(restaurantId, latitude, longitude, radiusKm, session.access_token);
+      await refreshCatalog();
     },
     addRestaurantCategory: (restaurantId, category) => {
       const clean = category.trim();

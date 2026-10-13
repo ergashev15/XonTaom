@@ -81,19 +81,14 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
-def releaseKeystoreProperties = new Properties()
-def releaseKeystorePropertiesFile = rootProject.file('keystore.properties')
-if (releaseKeystorePropertiesFile.exists()) {
-    releaseKeystoreProperties.load(new FileInputStream(releaseKeystorePropertiesFile))
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
-def releaseSigningConfigured = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].every {
-    releaseKeystoreProperties[it]
-}
-def releaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
-def easBuild = System.getenv('EAS_BUILD') == 'true'
-if (releaseBuildRequested && !releaseSigningConfigured && !easBuild) {
-    throw new GradleException('Release signing is not configured. Create android/keystore.properties from keystore.properties.example.')
-}
+
+apply from: new File(["node", "--print", "require('path').dirname(require.resolve('@sentry/react-native/package.json'))"].execute().text.trim(), "sentry.gradle")
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -118,12 +113,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-        if (releaseSigningConfigured) {
+        if (hasReleaseKeystore) {
             release {
-                storeFile file(releaseKeystoreProperties['storeFile'])
-                storePassword releaseKeystoreProperties['storePassword']
-                keyAlias releaseKeystoreProperties['keyAlias']
-                keyPassword releaseKeystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
             }
         }
     }
@@ -132,7 +127,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            if (releaseSigningConfigured) signingConfig signingConfigs.release
+            if (hasReleaseKeystore) signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -149,6 +144,16 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+// Never accidentally publish a release signed with Android's public debug key.
+// EAS injects the managed production credential later in its build lifecycle.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name.toLowerCase().contains('release') }
+        && !hasReleaseKeystore
+        && System.getenv('EAS_BUILD') != 'true') {
+        throw new GradleException('Production signing is missing. Create android/keystore.properties or build the production profile with EAS.')
     }
 }
 

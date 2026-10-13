@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { catalogApiEnvironment } from "@/api/catalog-api";
 import { parseHours } from "@/api/owner-api";
 import { AppText, Button, Card, Chip, Field, Row, StatusPill } from "@/components/ui";
+import { MapPicker } from "@/components/map-picker";
 import { useAppStore } from "@/store/app-store";
 import type { StaffRole } from "@/types";
 import { colors, spacing } from "@/theme";
@@ -16,9 +17,12 @@ const roles: StaffRole[] = ["Egasi", "Administrator", "Operator", "Oshpaz"];
 const demoOnly = !catalogApiEnvironment.isConfigured;
 
 export function RestaurantManagement({ restaurantId }: { restaurantId: string }) {
-  const { restaurants, campaigns, reviews, staff, updateRestaurantHours, addRestaurantCategory, deleteRestaurantCategory, addCampaign, toggleCampaign, addStaffMember, toggleStaffMember, replyToReview, sendNotification } = useAppStore();
+  const { restaurants, campaigns, reviews, staff, updateRestaurantHours, updateDeliveryZone, addRestaurantCategory, deleteRestaurantCategory, addCampaign, toggleCampaign, addStaffMember, toggleStaffMember, replyToReview, sendNotification } = useAppStore();
   const restaurant = restaurants.find((entry) => entry.id === restaurantId)!;
   const [hours, setHours] = useState(restaurant.hours);
+  const [coordinate, setCoordinate] = useState(restaurant.latitude !== undefined && restaurant.longitude !== undefined ? { latitude: restaurant.latitude, longitude: restaurant.longitude } : undefined);
+  const [deliveryRadius, setDeliveryRadius] = useState(String(restaurant.deliveryRadiusKm ?? 5));
+  const [savingZone, setSavingZone] = useState(false);
   const [category, setCategory] = useState("");
   const [campaignTitle, setCampaignTitle] = useState("");
   const [campaignPercent, setCampaignPercent] = useState("10");
@@ -35,6 +39,8 @@ export function RestaurantManagement({ restaurantId }: { restaurantId: string })
 
   return <View style={{ gap: spacing.md }}>
     <Card><AppText variant="heading">Ish vaqti</AppText><Field label="HAR KUNGI ISH VAQTI" value={hours} onChangeText={setHours} placeholder="09:00–23:00" /><AppText variant="caption" color={colors.muted}>Bu vaqtdan tashqarida mijozlar buyurtma bera olmaydi.</AppText><Button title="Ish vaqtini saqlash" icon="time-outline" onPress={() => { try { parseHours(hours); } catch (caught) { notify("Ish vaqti noto‘g‘ri", caught instanceof Error ? caught.message : "09:00–23:00 ko‘rinishida kiriting."); return; } updateRestaurantHours(restaurantId, hours.trim()); notify("Saqlandi", "Restoran ish vaqti yangilandi."); }} /></Card>
+
+    <Card><AppText variant="heading">Yetkazish hududi</AppText><AppText variant="caption" color={colors.muted}>Restoran joyini belgilang va xizmat radiusini kiriting. Hududdan tashqaridagi buyurtmani server qabul qilmaydi.</AppText><MapPicker value={coordinate} onChange={setCoordinate} radiusKm={Number(deliveryRadius) || undefined} /><Field label="YETKAZISH RADIUSI (KM)" value={deliveryRadius} onChangeText={(value) => setDeliveryRadius(value.replace(/[^\d.]/g, ""))} keyboardType="decimal-pad" placeholder="5" /><Button title="Yetkazish hududini saqlash" icon="map-outline" loading={savingZone} disabled={!coordinate || savingZone} onPress={async () => { if (!coordinate) return; const radius = Number(deliveryRadius); if (!Number.isFinite(radius) || radius < 0.5 || radius > 50) { notify("Radius noto‘g‘ri", "0.5 km dan 50 km gacha kiriting."); return; } setSavingZone(true); try { await updateDeliveryZone(restaurantId, coordinate.latitude, coordinate.longitude, radius); notify("Saqlandi", "Yetkazish hududi yangilandi."); } catch (caught) { notify("Saqlanmadi", caught instanceof Error ? caught.message : "Qayta urinib ko‘ring."); } finally { setSavingZone(false); } }} /></Card>
 
     <Card><AppText variant="heading">Kategoriyalar</AppText><View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>{categories.map((item) => <View key={item} style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingLeft: spacing.md, padding: spacing.xs, borderRadius: 999, backgroundColor: colors.greenSoft }}><AppText variant="caption" color={colors.green} style={{ fontWeight: "800" }}>{item}</AppText>{restaurant.categories?.includes(item) ? <Button title="×" size="sm" variant="danger" onPress={() => { if (restaurant.menu.some((dish) => dish.category === item)) { notify("Kategoriya bo‘sh emas", "Avval bu kategoriyadagi taomlarni boshqa kategoriyaga o‘tkazing yoki o‘chiring."); return; } deleteRestaurantCategory(restaurantId, item); }} /> : null}</View>)}</View><Field label="YANGI KATEGORIYA" value={category} onChangeText={setCategory} placeholder="Masalan: Desertlar" /><Button title="Kategoriya qo‘shish" icon="add-outline" disabled={category.trim().length < 2} onPress={() => { addRestaurantCategory(restaurantId, category); setCategory(""); }} /></Card>
 

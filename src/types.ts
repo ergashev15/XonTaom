@@ -80,6 +80,9 @@ export type Restaurant = {
   deliveryFee: number;
   eta: string;
   commission: number;
+  latitude?: number;
+  longitude?: number;
+  deliveryRadiusKm?: number;
   categories?: string[];
   menu: MenuItem[];
 };
@@ -146,6 +149,8 @@ export type SavedAddress = {
   address: string;
   house: string;
   landmark: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export type AppNotification = {

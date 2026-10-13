@@ -6,6 +6,11 @@ dist-preview/
 .env.local
 *.apk
 *.log
+*.jks
+*.keystore
+android/keystore.properties
+google-service-account*.json
+firebase-service-account*.json
 .DS_Store
 
 # This folder is published and versioned as a separate Sites project.

@@ -13,7 +13,7 @@ const minutesBetween = (start: string, end?: string) => end ? Math.max(0, Math.r
 
 export default function AdminPanelScreen() {
   const { restaurants, orders, campaigns, reviews, restaurantApplications, reviewRestaurant, reviewMenuItem, toggleBlocked, toggleCampaign, toggleReview, sendNotification, approveRestaurantApplication, rejectRestaurantApplication } = useAppStore();
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const [reviewingId, setReviewingId] = useState<string>();
   const reviewApplication = async (id: string, name: string, approve: boolean) => {
     if (reviewingId) return;
@@ -54,7 +54,10 @@ export default function AdminPanelScreen() {
   const filteredOrders = useMemo(() => orders.filter((order) => `${order.id} ${order.restaurantName} ${order.customerName}`.toLowerCase().includes(query.toLowerCase()) && (status === "Barchasi" || order.status === status)), [orders, query, status]);
 
   return <Screen>
-    <View><AppText variant="title">XonTaom boshqaruvi</AppText><AppText color={colors.muted}>Platforma holati, sifat va moliyaviy nazorat</AppText></View>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, flexWrap: "wrap" }}>
+      <View><AppText variant="title">XonTaom boshqaruvi</AppText><AppText color={colors.muted}>Platforma holati, sifat va moliyaviy nazorat</AppText></View>
+      <Button title="Chiqish" icon="log-out-outline" variant="ghost" onPress={() => { void signOut().then(() => router.replace("/")); }} />
+    </View>
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}><Metric label="Qabul tezligi" value={`${avgAccept} daq`} /><Metric label="Rad etish" value={`${rejectionRate}%`} tone="orange" /><Metric label="O‘rtacha yetkazish" value={`${avgDelivery} daq`} /><Metric label="Komissiya qarzi" value={money(commission)} tone="orange" /></View>
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>{["Umumiy", "Arizalar", "Moderatsiya", "Muammolar", "Restoranlar", "Buyurtmalar", "Kontent"].map((item) => <Chip key={item} label={item === "Moderatsiya" ? `Moderatsiya · ${pendingCount}` : item === "Arizalar" ? `Arizalar · ${restaurantApplications.filter((entry) => entry.status === "Kutilmoqda").length}` : item} active={tab === item} onPress={() => setTab(item)} />)}</View>
 

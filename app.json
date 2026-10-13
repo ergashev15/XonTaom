@@ -20,6 +20,10 @@
     },
     "android": {
       "package": "uz.xontaom.app",
+      "versionCode": 19,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/xontaom-app-icon.png",
         "backgroundColor": "#B6000C"
@@ -37,6 +41,13 @@
       ],
       "expo-font",
       "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "color": "#18B66A",
+          "defaultChannel": "orders"
+        }
+      ],
       "expo-web-browser",
       [
         "react-native-nitro-google-signin",

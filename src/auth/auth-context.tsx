@@ -1,6 +1,7 @@
 import React, { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 import { AuthSession, authEnvironment, refreshSession, restoreSession, signOutSession } from "@/auth/auth-service";
+import { unregisterCurrentDevice } from "@/notifications/push-service";
 
 // Refresh this long before the access token expires.
 const REFRESH_MARGIN_MS = 60_000;
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session]);
 
   const signOut = useCallback(async () => {
+    if (session?.access_token) await unregisterCurrentDevice(session.access_token);
     await signOutSession(session);
     setSession(null);
   }, [session]);

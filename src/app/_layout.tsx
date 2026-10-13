@@ -7,6 +7,7 @@ import { AccessibilityInfo, ActivityIndicator, View } from "react-native";
 import { AuthProvider, useAuth } from "@/auth/auth-context";
 import { isRegistrationComplete, roleOf, routeForRole } from "@/auth/auth-service";
 import { AppStoreProvider } from "@/store/app-store";
+import { PushNotificationBridge } from "@/notifications/push-notifications";
 import { AppThemeProvider, colors, useAppTheme } from "@/theme";
 
 function AppNavigator() {
@@ -44,6 +45,9 @@ function AppNavigator() {
         <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
         <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+        <Stack.Screen name="privacy-policy" options={{ title: "Maxfiylik siyosati", headerShown: false }} />
+        <Stack.Screen name="terms" options={{ title: "Foydalanish shartlari", headerShown: false }} />
+        <Stack.Screen name="delete-account" options={{ title: "Akkauntni o‘chirish", headerShown: false }} />
         <Stack.Screen name="restaurant-application" options={{ title: "Restoran qo‘shish" }} />
         <Stack.Screen name="home" options={{ title: "XonTaom", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />
         <Stack.Screen name="restaurants" options={{ title: "Restoranlar", headerShown: false, animation: reducedMotion ? "fade" : "none" }} />
@@ -62,5 +66,5 @@ function AppNavigator() {
 }
 
 export default function RootLayout() {
-  return <AppThemeProvider><AuthProvider><AppStoreProvider><AppNavigator /></AppStoreProvider></AuthProvider></AppThemeProvider>;
+  return <AppThemeProvider><AuthProvider><PushNotificationBridge /><AppStoreProvider><AppNavigator /></AppStoreProvider></AuthProvider></AppThemeProvider>;
 }

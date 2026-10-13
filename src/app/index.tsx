@@ -52,7 +52,7 @@ export default function LoginScreen() {
     }
   };
 
-  return <AuthScreen footer={<AppText variant="caption" color={authColors.muted} style={{ textAlign: "center" }}>Foydalanish shartlari · Maxfiylik siyosati</AppText>}>
+  return <AuthScreen footer={<View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.xs }}><Pressable accessibilityRole="link" onPress={() => router.push("/terms" as never)}><AppText variant="caption" color={authColors.muted} style={{ textDecorationLine: "underline" }}>Foydalanish shartlari</AppText></Pressable><AppText variant="caption" color={authColors.muted}>·</AppText><Pressable accessibilityRole="link" onPress={() => router.push("/privacy-policy" as never)}><AppText variant="caption" color={authColors.muted} style={{ textDecorationLine: "underline" }}>Maxfiylik siyosati</AppText></Pressable></View>}>
     <AuthBrand subtitle="Sevimli taomlaringizga bir qadam qoldi" />
     <View style={{ alignItems: "center", gap: spacing.xs, paddingTop: spacing.sm }}><AppText variant="hero" color={authColors.text} style={{ fontSize: 34, lineHeight: 40 }}>Kirish</AppText><AppText color={authColors.muted}>Akkauntingizga xavfsiz kiring</AppText></View>
     {error ? <AuthErrorBanner message={error} /> : null}

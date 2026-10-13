@@ -153,7 +153,7 @@ gradle.taskGraph.whenReady { graph ->
     if (graph.allTasks.any { it.name.toLowerCase().contains('release') }
         && !hasReleaseKeystore
         && System.getenv('EAS_BUILD') != 'true') {
-        throw new GradleException('Production signing is missing. Create android/keystore.properties or build the production profile with EAS.')
+        throw new org.gradle.api.GradleException('Production signing is missing. Create android/keystore.properties or build the production profile with EAS.')
     }
 }
 

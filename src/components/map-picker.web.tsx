@@ -4,7 +4,7 @@ import { AppText, Button } from "@/components/ui";
 import { colors, radius, spacing } from "@/theme";
 import type { Coordinate } from "@/utils/geo";
 
-export function MapPicker({ value, onChange }: { value?: Coordinate; onChange: (value: Coordinate) => void; radiusKm?: number }) {
+export function MapPicker({ value, onChange }: { value?: Coordinate; onChange: (value: Coordinate) => void; radiusKm?: number; zoneCenter?: Coordinate }) {
   const [locating, setLocating] = useState(false);
   const locate = () => {
     setLocating(true);

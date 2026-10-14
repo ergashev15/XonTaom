@@ -25,7 +25,7 @@ export default function RestaurantsScreen() {
     <Screen safeTop maxWidth={820} style={{ paddingBottom: isDesktop ? spacing.xxl : 124 }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}>
         <View style={{ gap: 3 }}><AppText variant="title">Restoranlar</AppText><AppText variant="caption" color={colors.muted}>{visible.length} ta mazali manzil</AppText></View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: 8, paddingHorizontal: 11, borderRadius: radius.full, backgroundColor: colors.greenSoft }}><Ionicons name="location" size={15} color={colors.green} /><AppText variant="caption" color={colors.green} style={{ fontWeight: "800" }}>Xonobod</AppText><Ionicons name="chevron-down" size={13} color={colors.green} /></View>
+        <PressableScale accessibilityLabel="Yetkazish manzilini tanlash" onPress={() => router.push("/addresses" as never)} style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: 8, paddingHorizontal: 11, borderRadius: radius.full, backgroundColor: colors.greenSoft }}><Ionicons name="location" size={15} color={colors.green} /><AppText variant="caption" color={colors.green} style={{ fontWeight: "800" }}>Xonobod</AppText><Ionicons name="chevron-down" size={13} color={colors.green} /></PressableScale>
       </View>
 
       <SearchField accessibilityLabel="Restoran qidirish" value={query} onChangeText={setQuery} placeholder="Restoran yoki taom turini qidiring..." />

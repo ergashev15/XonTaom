@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
 import { breakpoints, colors, layout, money, radius, shadow, spacing, type, useAppTheme } from "@/theme";
 import { Restaurant } from "@/types";
-import { DropletBackdrop, GlassSurface } from "@/components/glass-surface";
+import { GlassSurface } from "@/components/glass-surface";
 
 const router = expoRouter as typeof expoRouter & { replace: (href: string) => void };
 
@@ -17,7 +17,7 @@ export function Screen({ children, style, maxWidth, safeTop = false }: { childre
   const insets = useSafeAreaInsets();
   const edgePadding = width >= breakpoints.desktop ? spacing.lg : spacing.md;
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}><DropletBackdrop /><ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" style={{ flex: 1, backgroundColor: "transparent" }} contentContainerStyle={[{ paddingHorizontal: edgePadding, paddingTop: safeTop ? Math.max(edgePadding, insets.top + spacing.sm) : edgePadding, gap: spacing.lg, alignSelf: "center", width: "100%", maxWidth: maxWidth ?? (width >= breakpoints.tablet ? layout.contentMax : layout.phoneMax), paddingBottom: spacing.xxl }, style]}>{children}</ScrollView></View>
+    <View style={{ flex: 1, backgroundColor: colors.background }}><ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" style={{ flex: 1, backgroundColor: "transparent" }} contentContainerStyle={[{ paddingHorizontal: edgePadding, paddingTop: safeTop ? Math.max(edgePadding, insets.top + spacing.sm) : edgePadding, gap: spacing.lg, alignSelf: "center", width: "100%", maxWidth: maxWidth ?? (width >= breakpoints.tablet ? layout.contentMax : layout.phoneMax), paddingBottom: spacing.xxl }, style]}>{children}</ScrollView></View>
   );
 }
 
@@ -65,10 +65,10 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
 
 export function SearchField({ value, onChangeText, placeholder, accessibilityLabel, trailingIcon = "options-outline", onTrailingPress }: { value: string; onChangeText: (value: string) => void; placeholder: string; accessibilityLabel: string; trailingIcon?: keyof typeof Ionicons.glyphMap; onTrailingPress?: () => void }) {
   useAppTheme();
-  return <View style={{ minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.lg, borderCurve: "continuous", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, boxShadow: shadow.subtle }}>
-    <View style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.greenSoft }}><Ionicons name="search" size={19} color={colors.green} /></View>
+  return <View style={{ minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.full, borderCurve: "continuous", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, boxShadow: shadow.subtle }}>
+    <View style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center" }}><Ionicons name="search" size={20} color={colors.muted} /></View>
     <TextInput accessibilityLabel={accessibilityLabel} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.placeholder} returnKeyType="search" style={{ flex: 1, minHeight: 54, color: colors.ink, fontSize: 15, fontWeight: "600" }} />
-    {value ? <PressableScale accessibilityLabel="Qidiruvni tozalash" onPress={() => onChangeText("")} hitSlop={8} style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center" }}><Ionicons name="close-circle" size={21} color={colors.muted} /></PressableScale> : onTrailingPress ? <PressableScale accessibilityLabel="Filtrlar" onPress={onTrailingPress} hitSlop={8} style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.surfaceMuted }}><Ionicons name={trailingIcon} size={20} color={colors.ink} /></PressableScale> : <View style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.surfaceMuted }}><Ionicons name={trailingIcon} size={20} color={colors.ink} /></View>}
+    {value ? <PressableScale accessibilityLabel="Qidiruvni tozalash" onPress={() => onChangeText("")} hitSlop={8} style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center" }}><Ionicons name="close-circle" size={21} color={colors.muted} /></PressableScale> : onTrailingPress ? <PressableScale accessibilityLabel="Filtrlar" onPress={onTrailingPress} hitSlop={8} style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.surfaceMuted }}><Ionicons name={trailingIcon} size={20} color={colors.ink} /></PressableScale> : null}
   </View>;
 }
 
@@ -120,16 +120,15 @@ export function SectionHeader({ title, subtitle, action, onAction }: { title: st
 
 export function BottomDock({ active, cartCount = 0 }: { active: CustomerRoute; cartCount?: number }) {
   const items = customerNavItems(cartCount);
-  return <GlassSurface intensity={96} style={{ flexDirection: "row", borderRadius: 0, paddingTop: 7, paddingBottom: 5, paddingHorizontal: 5, borderWidth: 0, borderTopWidth: 1, borderTopColor: colors.line, boxShadow: "0 -8px 28px rgba(10,32,20,0.09)" }}>{items.map((item) => <DockItem key={item.key} item={item} selected={item.key === active} />)}</GlassSurface>;
+  return <View style={{ flexDirection: "row", paddingTop: 7, paddingBottom: 5, paddingHorizontal: 8, backgroundColor: colors.greenDark, boxShadow: "0 -8px 28px rgba(12,14,35,0.20)" }}>{items.map((item) => <DockItem key={item.key} item={item} selected={item.key === active} />)}</View>;
 }
 
 type CustomerRoute = "home" | "restaurants" | "dishes" | "cart" | "profile" | "orders";
-function customerNavItems(cartCount: number): { key: CustomerRoute; label: string; icon: keyof typeof Ionicons.glyphMap; href: "/home" | "/restaurants" | "/dishes" | "/cart" | "/profile"; badge?: number }[] {
+function customerNavItems(_cartCount: number): { key: CustomerRoute; label: string; icon: keyof typeof Ionicons.glyphMap; href: "/home" | "/restaurants" | "/orders" | "/profile"; badge?: number }[] {
   return [
     { key: "home", label: "Bosh sahifa", icon: "home", href: "/home" },
-    { key: "restaurants", label: "Restoranlar", icon: "restaurant", href: "/restaurants" },
-    { key: "dishes", label: "Taomlar", icon: "fast-food", href: "/dishes" },
-    { key: "cart", label: "Savat", icon: "bag-handle", href: "/cart", badge: cartCount || undefined },
+    { key: "restaurants", label: "Qidiruv", icon: "search", href: "/restaurants" },
+    { key: "orders", label: "Buyurtmalar", icon: "receipt", href: "/orders" },
     { key: "profile", label: "Profil", icon: "person", href: "/profile" }
   ];
 }
@@ -137,7 +136,7 @@ function customerNavItems(cartCount: number): { key: CustomerRoute; label: strin
 function DockItem({ item, selected }: { item: ReturnType<typeof customerNavItems>[number]; selected: boolean }) {
   const [pressed, setPressed] = useState(false);
   const reducedMotion = useReducedMotion();
-  return <AnimatedPressable accessibilityRole="button" accessibilityLabel={item.badge ? `${item.label}, ${item.badge} ta` : item.label} accessibilityState={{ selected }} onPress={() => { if (!selected) router.replace(item.href); }} onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)} pressRetentionOffset={16} style={[motionStyles.base, pressed && !reducedMotion ? motionStyles.pressed : undefined, { flex: 1, minHeight: 57, borderRadius: radius.md, alignItems: "center", justifyContent: "center", gap: 2, backgroundColor: "transparent", opacity: pressed ? 0.72 : 1 }]}><View style={{ minWidth: 34, height: 28, paddingHorizontal: 7, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: selected ? colors.greenSoft : "transparent" }}><Ionicons name={item.icon} size={21} color={selected ? colors.green : colors.muted} />{item.badge ? <View style={{ position: "absolute", right: -4, top: -5, minWidth: 17, height: 17, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.surface }}><AppText color={colors.white} style={{ fontSize: 8, lineHeight: 10, fontWeight: "900", fontVariant: ["tabular-nums"] }}>{item.badge}</AppText></View> : null}</View><AppText variant="caption" color={selected ? colors.green : colors.muted} style={{ fontSize: 9, fontWeight: selected ? "900" : "600" }}>{item.label}</AppText></AnimatedPressable>;
+  return <AnimatedPressable accessibilityRole="button" accessibilityLabel={item.badge ? `${item.label}, ${item.badge} ta` : item.label} accessibilityState={{ selected }} onPress={() => router.replace(item.href)} onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)} pressRetentionOffset={16} style={[motionStyles.base, pressed && !reducedMotion ? motionStyles.pressed : undefined, { flex: 1, minHeight: 57, borderRadius: radius.md, alignItems: "center", justifyContent: "center", gap: 3, opacity: pressed ? 0.72 : 1 }]}><View style={{ minWidth: 34, height: 28, paddingHorizontal: 7, alignItems: "center", justifyContent: "center" }}><Ionicons name={item.icon} size={22} color={selected ? colors.green : "#D5D5DF"} />{item.badge ? <View style={{ position: "absolute", right: -4, top: -5, minWidth: 17, height: 17, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.greenDark }}><AppText color={colors.white} style={{ fontSize: 8, lineHeight: 10, fontWeight: "900", fontVariant: ["tabular-nums"] }}>{item.badge}</AppText></View> : null}</View><AppText variant="caption" color={selected ? colors.green : "#D5D5DF"} style={{ fontSize: 9, fontWeight: selected ? "900" : "600" }}>{item.label}</AppText></AnimatedPressable>;
 }
 
 export function CustomerShell({ active, cartCount = 0, children }: { active: CustomerRoute; cartCount?: number; children: React.ReactNode }) {
@@ -145,9 +144,9 @@ export function CustomerShell({ active, cartCount = 0, children }: { active: Cus
   const insets = useSafeAreaInsets();
   const items = customerNavItems(cartCount);
   return <View style={{ flex: 1, flexDirection: isDesktop ? "row" : "column", backgroundColor: colors.background }}>
-    {isDesktop ? <View style={{ width: layout.desktopRail, padding: spacing.md, zIndex: 2 }}><GlassSurface intensity={90} style={{ flex: 1, padding: spacing.md, justifyContent: "space-between", boxShadow: shadow.raised }}><View style={{ gap: spacing.xl }}><View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}><View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.green, alignItems: "center", justifyContent: "center" }}><Ionicons name="restaurant" size={22} color={colors.white} /></View><AppText variant="heading" color={colors.green}>XonTaom</AppText></View><View style={{ gap: spacing.sm }}>{items.map((item) => { const selected = active === item.key; return <PressableScale key={item.key} accessibilityLabel={item.label} accessibilityState={{ selected }} onPress={() => { if (!selected) router.replace(item.href); }} style={{ minHeight: 52, paddingHorizontal: spacing.md, borderRadius: radius.md, flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: selected ? colors.green : "transparent" }}><Ionicons name={item.icon} size={21} color={selected ? colors.white : colors.muted} /><AppText color={selected ? colors.white : colors.ink} style={{ fontWeight: "800" }}>{item.label}</AppText></PressableScale>; })}</View></View><View style={{ gap: spacing.xs }}><AppText variant="caption" color={colors.muted}>Yetkazish hududi</AppText><AppText variant="caption">Xonobod shahri</AppText></View></GlassSurface></View> : null}
+    {isDesktop ? <View style={{ width: layout.desktopRail, padding: spacing.md, zIndex: 2 }}><GlassSurface intensity={90} style={{ flex: 1, padding: spacing.md, justifyContent: "space-between", boxShadow: shadow.raised }}><View style={{ gap: spacing.xl }}><View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}><View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.green, alignItems: "center", justifyContent: "center" }}><Ionicons name="restaurant" size={22} color={colors.white} /></View><AppText variant="heading" color={colors.green}>XonTaom</AppText></View><View style={{ gap: spacing.sm }}>{items.map((item) => { const selected = active === item.key; return <PressableScale key={item.key} accessibilityLabel={item.label} accessibilityState={{ selected }} onPress={() => router.replace(item.href)} style={{ minHeight: 52, paddingHorizontal: spacing.md, borderRadius: radius.md, flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: selected ? colors.green : "transparent" }}><Ionicons name={item.icon} size={21} color={selected ? colors.white : colors.muted} /><AppText color={selected ? colors.white : colors.ink} style={{ fontWeight: "800" }}>{item.label}</AppText></PressableScale>; })}</View></View><View style={{ gap: spacing.xs }}><AppText variant="caption" color={colors.muted}>Yetkazish hududi</AppText><AppText variant="caption">Xonobod shahri</AppText></View></GlassSurface></View> : null}
     <View style={{ flex: 1, minWidth: 0 }}>{children}</View>
-    {!isDesktop ? <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom, backgroundColor: colors.surface, zIndex: 10 }}><BottomDock active={active} cartCount={cartCount} /></View> : null}
+    {!isDesktop ? <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom, backgroundColor: colors.greenDark, zIndex: 10 }}><BottomDock active={active} cartCount={cartCount} /></View> : null}
   </View>;
 }
 

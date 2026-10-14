@@ -88,7 +88,21 @@ if (hasReleaseKeystore) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-apply from: new File(["node", "--print", "require('path').dirname(require.resolve('@sentry/react-native/package.json'))"].execute().text.trim(), "sentry.gradle")
+def sentryProperties = new Properties()
+def sentryPropertiesFile = rootProject.file('sentry.properties')
+if (sentryPropertiesFile.exists()) {
+    sentryProperties.load(new FileInputStream(sentryPropertiesFile))
+}
+def hasSentryUploadConfig =
+    (sentryProperties['defaults.org'] ?: System.getenv('SENTRY_ORG')) &&
+    (sentryProperties['defaults.project'] ?: System.getenv('SENTRY_PROJECT')) &&
+    (sentryProperties['auth.token'] ?: System.getenv('SENTRY_AUTH_TOKEN'))
+
+if (hasSentryUploadConfig) {
+    apply from: new File(["node", "--print", "require('path').dirname(require.resolve('@sentry/react-native/package.json'))"].execute().text.trim(), "sentry.gradle")
+} else {
+    logger.lifecycle('Sentry source-map upload skipped: organization, project, or auth token is not configured.')
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -153,7 +167,7 @@ gradle.taskGraph.whenReady { graph ->
     if (graph.allTasks.any { it.name.toLowerCase().contains('release') }
         && !hasReleaseKeystore
         && System.getenv('EAS_BUILD') != 'true') {
-        throw new org.gradle.api.GradleException('Production signing is missing. Create android/keystore.properties or build the production profile with EAS.')
+        throw new IllegalStateException('Production signing is missing. Create android/keystore.properties or build the production profile with EAS.')
     }
 }
 

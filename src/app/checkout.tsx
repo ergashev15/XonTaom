@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { catalogApiEnvironment } from "@/api/catalog-api";
@@ -14,6 +14,7 @@ import { cartUnitPrice } from "@/utils/order-rules";
 import { distanceKm, isInsideDeliveryZone } from "@/utils/geo";
 
 export default function CheckoutScreen() {
+  const { payment: initialPayment } = useLocalSearchParams<{ payment?: string }>();
   const { cart, cartRestaurant, placeOrder } = useAppStore();
   const { isDesktop } = useResponsiveLayout();
   const { session } = useAuth();
@@ -51,7 +52,7 @@ export default function CheckoutScreen() {
     return () => controller.abort();
   }, [accessToken, demo]);
   const [note, setNote] = useState("");
-  const [payment, setPayment] = useState<Order["payment"]>("Naqd");
+  const [payment, setPayment] = useState<Order["payment"]>(initialPayment === "card" ? "Yetkazilganda karta orqali" : "Naqd");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const subtotal = cart.reduce((sum, item) => sum + cartUnitPrice(item) * item.quantity, 0);

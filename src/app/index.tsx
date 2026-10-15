@@ -78,21 +78,17 @@ function WelcomeScreen({ onLogin }: { onLogin: () => void }) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const compact = height < 700;
-  const heroHeight = Math.max(compact ? 280 : 330, Math.min(height * 0.45, 390));
   const sidePadding = width < 380 ? spacing.md : spacing.lg;
 
-  return <View style={{ flex: 1, backgroundColor: "#FFF5E9" }}>
-    <View style={{ height: heroHeight, alignItems: "center", justifyContent: "center", paddingTop: insets.top + spacing.sm, paddingHorizontal: sidePadding, gap: compact ? 4 : spacing.sm, zIndex: 2 }}>
-      <BrandMark compact={compact} />
+  return <View style={{ flex: 1, backgroundColor: colors.greenDark }}>
+    <Image source={require("../../assets/welcome-national-foods.png")} contentFit="cover" contentPosition={{ left: "62%", top: "center" }} transition={220} style={{ position: "absolute", inset: 0 }} />
+    <View style={{ position: "absolute", inset: 0, backgroundColor: "rgba(8,10,28,0.52)" }} />
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: insets.top + spacing.sm, paddingBottom: compact ? 150 : 210, paddingHorizontal: sidePadding, gap: compact ? spacing.md : spacing.lg }}>
       <View style={{ alignItems: "center", gap: compact ? 0 : 4 }}>
-        <AppText variant="hero" color={colors.greenDark} style={{ fontSize: compact ? 38 : 44, lineHeight: compact ? 43 : 50, letterSpacing: -1.7 }}>XonTaom</AppText>
-        <AppText color="#555267" style={{ textAlign: "center", lineHeight: 22 }}>Yaxshi taom yaqinlashtiradi</AppText>
+        <AppText variant="hero" color={colors.white} style={{ fontSize: compact ? 38 : 44, lineHeight: compact ? 43 : 50, letterSpacing: -1.7 }}>XonTaom</AppText>
+        <AppText color="#E5E3EC" style={{ textAlign: "center", lineHeight: 22 }}>Yaxshi taom yaqinlashtiradi</AppText>
       </View>
-    </View>
-    <View style={{ flex: 1, minHeight: 0, overflow: "hidden", borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderCurve: "continuous", backgroundColor: colors.greenDark }}>
-      <Image source={require("../../assets/welcome-national-foods.png")} contentFit="cover" contentPosition={{ left: "68%", top: "center" }} transition={220} style={{ position: "absolute", inset: 0 }} />
-      <View style={{ position: "absolute", inset: 0, backgroundColor: "rgba(10,13,34,0.30)" }} />
-      <View style={{ position: "absolute", top: spacing.md, alignSelf: "center", maxWidth: "88%", minHeight: 38, paddingHorizontal: 14, borderRadius: radius.full, borderWidth: 1, borderColor: "rgba(255,255,255,0.20)", backgroundColor: "rgba(18,22,47,0.74)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }}>
+      <View style={{ maxWidth: "92%", minHeight: 38, paddingHorizontal: 14, borderRadius: radius.full, borderWidth: 1, borderColor: "rgba(255,255,255,0.24)", backgroundColor: "rgba(18,22,47,0.76)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }}>
         <Ionicons name="location" size={16} color="#FF7A51" />
         <AppText variant="caption" color={colors.white} style={{ fontWeight: "800" }}>Xonobod bo‘ylab tezkor yetkazamiz</AppText>
       </View>
@@ -106,19 +102,5 @@ function WelcomeScreen({ onLogin }: { onLogin: () => void }) {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><AppText color="#D7D5DF">Hisobim bor</AppText><AppText color={colors.white} style={{ fontWeight: "900" }}>Kirish</AppText></View>
       </Pressable>
     </View>
-  </View>;
-}
-
-function BrandMark({ compact = false }: { compact?: boolean }) {
-  const size = compact ? 94 : 108;
-  const leafWidth = compact ? 43 : 50;
-  const leafHeight = compact ? 21 : 24;
-  const edge = compact ? 13 : 15;
-  const vertical = compact ? 15 : 17;
-  return <View accessibilityLabel="XonTaom belgisi" style={{ width: size, height: size }}>
-    <View style={{ position: "absolute", left: edge, top: vertical, width: leafWidth, height: leafHeight, borderTopLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: "#29245D", transform: [{ rotate: "36deg" }] }} />
-    <View style={{ position: "absolute", right: edge, top: vertical, width: leafWidth, height: leafHeight, borderTopRightRadius: 28, borderBottomLeftRadius: 28, backgroundColor: "#83D43C", transform: [{ rotate: "-36deg" }] }} />
-    <View style={{ position: "absolute", left: edge, bottom: vertical, width: leafWidth, height: leafHeight, borderTopRightRadius: 28, borderBottomLeftRadius: 28, backgroundColor: "#FF5A2A", transform: [{ rotate: "-36deg" }] }} />
-    <View style={{ position: "absolute", right: edge, bottom: vertical, width: leafWidth, height: leafHeight, borderTopLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: "#29245D", transform: [{ rotate: "36deg" }] }} />
   </View>;
 }

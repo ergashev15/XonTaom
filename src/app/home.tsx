@@ -12,9 +12,9 @@ const router = expoRouter as typeof expoRouter & { push: (href: string | object)
 
 const categories: { label: string; query: string; image: ImageSource }[] = [
   { label: "Osh", query: "osh", image: require("../../assets/categories/milliy-osh.jpg") },
-  { label: "Somsa", query: "manti", image: require("../../assets/categories/fast-food-lavash.jpg") },
+  { label: "Somsa", query: "manti", image: require("../../assets/categories/somsa.jpg") },
   { label: "Shashlik", query: "shashlik", image: require("../../assets/categories/kabob.jpg") },
-  { label: "Milliy taomlar", query: "milliy", image: require("../../assets/categories/milliy-osh.jpg") },
+  { label: "Milliy taomlar", query: "milliy", image: require("../../assets/categories/milliy-taomlar.jpg") },
   { label: "Salatlar", query: "salat", image: require("../../assets/categories/salat.jpg") },
   { label: "Ichimliklar", query: "ichimlik", image: require("../../assets/categories/ichimliklar.jpg") }
 ];

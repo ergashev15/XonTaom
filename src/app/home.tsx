@@ -15,7 +15,8 @@ const categories: { label: string; query: string; image: ImageSource }[] = [
   { label: "Somsa", query: "manti", image: require("../../assets/categories/fast-food-lavash.jpg") },
   { label: "Shashlik", query: "shashlik", image: require("../../assets/categories/kabob.jpg") },
   { label: "Milliy taomlar", query: "milliy", image: require("../../assets/categories/milliy-osh.jpg") },
-  { label: "Salatlar", query: "salat", image: require("../../assets/categories/salat.jpg") }
+  { label: "Salatlar", query: "salat", image: require("../../assets/categories/salat.jpg") },
+  { label: "Ichimliklar", query: "ichimlik", image: require("../../assets/categories/ichimliklar.jpg") }
 ];
 
 export default function HomeScreen() {
@@ -39,7 +40,7 @@ export default function HomeScreen() {
           <PressableScale accessibilityLabel="Buyurtmalar va bildirishnomalar" onPress={() => router.push("/orders")} style={{ width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" }}><Ionicons name="notifications-outline" size={22} color={colors.white} /><View style={{ position: "absolute", right: 8, top: 7, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.greenDark }} /></PressableScale>
         </View>
 
-        <AppText variant="hero" color={colors.white} style={{ fontSize: 36, lineHeight: 39 }}>Nima tanovul{`\n`}<AppText variant="hero" color={colors.green} style={{ fontSize: 36, lineHeight: 39 }}>qilamiz?</AppText></AppText>
+        <AppText variant="hero" color={colors.white} style={{ fontSize: 34, lineHeight: 38 }}>Nima tanovul{`\n`}<AppText variant="hero" color={colors.green} style={{ fontSize: 34, lineHeight: 38 }}>qilamiz?</AppText></AppText>
 
         <View style={{ height: 48, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.full, backgroundColor: "rgba(255,255,255,0.18)", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)" }}><Ionicons name="search" size={21} color={colors.white} /><TextInput accessibilityLabel="Taom yoki restoran qidirish" value={query} onChangeText={setQuery} placeholder="Taom yoki restoran qidirish..." placeholderTextColor="#E0DEE7" returnKeyType="search" style={{ flex: 1, color: colors.white, fontSize: 14, fontWeight: "600" }} />{query ? <PressableScale accessibilityLabel="Qidiruvni tozalash" onPress={() => setQuery("")}><Ionicons name="close-circle" size={20} color={colors.white} /></PressableScale> : null}</View>
 

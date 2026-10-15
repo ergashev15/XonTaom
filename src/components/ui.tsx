@@ -124,19 +124,20 @@ export function BottomDock({ active, cartCount = 0 }: { active: CustomerRoute; c
 }
 
 type CustomerRoute = "home" | "restaurants" | "dishes" | "cart" | "profile" | "orders";
-function customerNavItems(_cartCount: number): { key: CustomerRoute; label: string; icon: keyof typeof Ionicons.glyphMap; href: "/home" | "/restaurants" | "/orders" | "/profile"; badge?: number }[] {
+function customerNavItems(cartCount: number): { key: CustomerRoute; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap; href: "/home" | "/restaurants" | "/dishes" | "/cart" | "/profile"; badge?: number }[] {
   return [
-    { key: "home", label: "Bosh sahifa", icon: "home", href: "/home" },
-    { key: "restaurants", label: "Qidiruv", icon: "search", href: "/restaurants" },
-    { key: "orders", label: "Buyurtmalar", icon: "receipt", href: "/orders" },
-    { key: "profile", label: "Profil", icon: "person", href: "/profile" }
+    { key: "home", label: "Bosh sahifa", icon: "home-outline", activeIcon: "home", href: "/home" },
+    { key: "restaurants", label: "Restoranlar", icon: "restaurant-outline", activeIcon: "restaurant", href: "/restaurants" },
+    { key: "dishes", label: "Taomlar", icon: "fast-food-outline", activeIcon: "fast-food", href: "/dishes" },
+    { key: "cart", label: "Savat", icon: "bag-handle-outline", activeIcon: "bag-handle", href: "/cart", badge: cartCount || undefined },
+    { key: "profile", label: "Profil", icon: "person-outline", activeIcon: "person", href: "/profile" }
   ];
 }
 
 function DockItem({ item, selected }: { item: ReturnType<typeof customerNavItems>[number]; selected: boolean }) {
   const [pressed, setPressed] = useState(false);
   const reducedMotion = useReducedMotion();
-  return <AnimatedPressable accessibilityRole="button" accessibilityLabel={item.badge ? `${item.label}, ${item.badge} ta` : item.label} accessibilityState={{ selected }} onPress={() => router.replace(item.href)} onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)} pressRetentionOffset={16} style={[motionStyles.base, pressed && !reducedMotion ? motionStyles.pressed : undefined, { flex: 1, minHeight: 57, borderRadius: radius.md, alignItems: "center", justifyContent: "center", gap: 3, opacity: pressed ? 0.72 : 1 }]}><View style={{ minWidth: 34, height: 28, paddingHorizontal: 7, alignItems: "center", justifyContent: "center" }}><Ionicons name={item.icon} size={22} color={selected ? colors.green : "#D5D5DF"} />{item.badge ? <View style={{ position: "absolute", right: -4, top: -5, minWidth: 17, height: 17, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.greenDark }}><AppText color={colors.white} style={{ fontSize: 8, lineHeight: 10, fontWeight: "900", fontVariant: ["tabular-nums"] }}>{item.badge}</AppText></View> : null}</View><AppText variant="caption" color={selected ? colors.green : "#D5D5DF"} style={{ fontSize: 9, fontWeight: selected ? "900" : "600" }}>{item.label}</AppText></AnimatedPressable>;
+  return <AnimatedPressable accessibilityRole="button" accessibilityLabel={item.badge ? `${item.label}, ${item.badge} ta mahsulot` : item.label} accessibilityState={{ selected }} onPress={() => router.replace(item.href)} onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)} pressRetentionOffset={16} style={[motionStyles.base, pressed && !reducedMotion ? motionStyles.pressed : undefined, { flex: 1, minWidth: 0, minHeight: 57, borderRadius: radius.md, alignItems: "center", justifyContent: "center", gap: 3, opacity: pressed ? 0.72 : 1 }]}><View style={{ minWidth: 32, height: 28, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" }}><Ionicons name={selected ? item.activeIcon : item.icon} size={22} color={selected ? colors.green : "#D5D5DF"} />{item.badge ? <View style={{ position: "absolute", right: -3, top: -5, minWidth: 17, height: 17, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.greenDark }}><AppText color={colors.white} style={{ fontSize: 8, lineHeight: 10, fontWeight: "900", fontVariant: ["tabular-nums"] }}>{Math.min(item.badge, 99)}</AppText></View> : null}</View><AppText variant="caption" color={selected ? colors.green : "#D5D5DF"} numberOfLines={1} style={{ fontSize: 9, lineHeight: 12, fontWeight: selected ? "900" : "600", textAlign: "center" }}>{item.label}</AppText></AnimatedPressable>;
 }
 
 export function CustomerShell({ active, cartCount = 0, children }: { active: CustomerRoute; cartCount?: number; children: React.ReactNode }) {

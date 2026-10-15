@@ -19,11 +19,11 @@ export const motion = {
 } as const;
 
 export const type = {
-  hero: { fontSize: 38, lineHeight: 43, fontWeight: "900" as const, letterSpacing: -1.2 },
-  title: { fontSize: 27, lineHeight: 33, fontWeight: "800" as const, letterSpacing: -0.55 },
-  heading: { fontSize: 19, lineHeight: 25, fontWeight: "800" as const, letterSpacing: -0.2 },
-  body: { fontSize: 16, lineHeight: 23, fontWeight: "500" as const },
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: "600" as const }
+  hero: { fontSize: 34, lineHeight: 40, fontWeight: "800" as const, letterSpacing: -0.9 },
+  title: { fontSize: 23, lineHeight: 29, fontWeight: "800" as const, letterSpacing: -0.4 },
+  heading: { fontSize: 18, lineHeight: 24, fontWeight: "800" as const, letterSpacing: -0.15 },
+  body: { fontSize: 15, lineHeight: 21, fontWeight: "500" as const },
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: "600" as const }
 } as const;
 
 export function money(value: number) {

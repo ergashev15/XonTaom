@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppText, Button, EmptyState, PressableScale } from "@/components/ui";
+import { AppText, Button, CustomerShell, EmptyState, PressableScale, useResponsiveLayout } from "@/components/ui";
 import { useAppStore } from "@/store/app-store";
 import { colors, money, radius, shadow, spacing } from "@/theme";
 import { cartUnitPrice } from "@/utils/order-rules";
@@ -12,15 +12,17 @@ import { cartUnitPrice } from "@/utils/order-rules";
 export default function CartScreen() {
   const { cart, cartRestaurant, campaigns, setCartQuantity, clearCart } = useAppStore();
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useResponsiveLayout();
   const [promoExpanded, setPromoExpanded] = useState(false);
   const subtotal = cart.reduce((sum, item) => sum + cartUnitPrice(item) * item.quantity, 0);
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  if (!cart.length || !cartRestaurant) return <View style={{ flex: 1, paddingTop: insets.top, paddingHorizontal: spacing.md, backgroundColor: colors.background }}><CartHeader onClear={clearCart} /><EmptyState icon="bag-handle-outline" title="Savat bo‘sh" text="Restoran menyusidan o‘zingizga yoqqan taomlarni qo‘shing." action={<Button title="Restoranlarni ko‘rish" onPress={() => router.replace("/restaurants" as never)} />} /></View>;
+  if (!cart.length || !cartRestaurant) return <CustomerShell active="cart" cartCount={0}><View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom + 82, paddingHorizontal: spacing.md, backgroundColor: colors.background }}><CartHeader onClear={clearCart} /><EmptyState icon="bag-handle-outline" title="Savat bo‘sh" text="Restoran menyusidan o‘zingizga yoqqan taomlarni qo‘shing." action={<Button title="Restoranlarni ko‘rish" onPress={() => router.replace("/restaurants" as never)} />} /></View></CustomerShell>;
 
   const total = subtotal + cartRestaurant.deliveryFee;
   const disabled = subtotal < cartRestaurant.minOrder || !cartRestaurant.isOpen;
-  return <View style={{ flex: 1, backgroundColor: colors.background }}>
-    <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: spacing.md, paddingBottom: insets.bottom + 108, gap: 12 }}>
+  return <CustomerShell active="cart" cartCount={cartCount}><View style={{ flex: 1, backgroundColor: colors.background }}>
+    <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: spacing.md, paddingBottom: isDesktop ? 108 : insets.bottom + 186, gap: 12 }}>
       <CartHeader onClear={clearCart} />
 
       <View style={{ gap: 10 }}>{cart.map((item) => <View key={item.lineId} style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 9, borderRadius: radius.md, borderCurve: "continuous", backgroundColor: colors.surface, boxShadow: shadow.subtle }}>
@@ -38,8 +40,8 @@ export default function CartScreen() {
       <ActionRow icon="card-outline" title="To‘lov usuli" subtitle="Yetkazilganda karta orqali" onPress={() => router.push({ pathname: "/checkout", params: { payment: "card" } })} />
     </ScrollView>
 
-    <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 10), backgroundColor: colors.background }}><PressableScale accessibilityLabel={`Buyurtma berish, ${money(total)}`} accessibilityState={{ disabled }} disabled={disabled} onPress={() => router.push("/checkout")} style={{ minHeight: 60, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 22, borderRadius: 20, backgroundColor: colors.green, boxShadow: shadow.raised }}><AppText color={colors.white} style={{ fontWeight: "900", fontSize: 17 }}>Buyurtma berish</AppText><View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}><AppText color={colors.white} style={{ fontWeight: "800" }}>{money(total)}</AppText><Ionicons name="arrow-forward" size={21} color={colors.white} /></View></PressableScale></View>
-  </View>;
+    <View style={{ position: "absolute", left: 0, right: 0, bottom: isDesktop ? 0 : insets.bottom + 70, paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 10, backgroundColor: colors.background }}><PressableScale accessibilityLabel={`Buyurtma berish, ${money(total)}`} accessibilityState={{ disabled }} disabled={disabled} onPress={() => router.push("/checkout")} style={{ minHeight: 60, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 22, borderRadius: 20, backgroundColor: colors.green, boxShadow: shadow.raised }}><AppText color={colors.white} style={{ fontWeight: "900", fontSize: 17 }}>Buyurtma berish</AppText><View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}><AppText color={colors.white} style={{ fontWeight: "800" }}>{money(total)}</AppText><Ionicons name="arrow-forward" size={21} color={colors.white} /></View></PressableScale></View>
+  </View></CustomerShell>;
 }
 
 function CartHeader({ onClear }: { onClear: () => void }) {
